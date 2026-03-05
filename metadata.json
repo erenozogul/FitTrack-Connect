@@ -1,0 +1,7 @@
+{
+  "name": "FitTrack Connect",
+  "description": "A comprehensive fitness management platform for personal trainers and students, featuring AI form analysis, live session monitoring, and workout libraries.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
