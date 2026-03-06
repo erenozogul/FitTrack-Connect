@@ -13,39 +13,54 @@ interface SignUpScreenProps {
 const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => {
   const navigate = useNavigate();
   const t = translations[lang];
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      try {
-        const storedUsers = JSON.parse(localStorage.getItem('fittrack_users') || '[]');
-        
-        if (storedUsers.some((u: any) => u.email === email)) {
-          setError(lang === 'tr' ? 'Bu e-posta adresi zaten kullanımda.' : 'This email is already in use.');
-          setIsLoading(false);
-          return;
-        }
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role,
+          firstName,
+          lastName,
+          username,
+          email,
+          password
+        }),
+      });
 
-        const newUser = { name, email, password, role };
-        storedUsers.push(newUser);
-        localStorage.setItem('fittrack_users', JSON.stringify(storedUsers));
+      const data = await response.json();
 
-        onSignUp(name);
-        navigate(role === 'trainer' ? '/library' : '/dashboard');
-      } catch (err) {
-        setError(lang === 'tr' ? 'Bir hata oluştu.' : 'An error occurred.');
-      } finally {
+      if (!response.ok) {
+        const errorKey = data.error as keyof typeof t;
+        setError(t[errorKey] || t.error_generic);
         setIsLoading(false);
+        return;
       }
-    }, 800);
+
+      localStorage.setItem('fittrack_token', data.token);
+      localStorage.setItem('fittrack_user', JSON.stringify(data.user));
+
+      onSignUp(`${firstName} ${lastName}`);
+      navigate(role === 'trainer' ? '/library' : '/dashboard');
+    } catch (err) {
+      setError(lang === 'tr' ? 'Bir hata oluştu. Lütfen tekrar deneyin.' : 'An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -81,17 +96,48 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
         )}
 
         <form className="w-full space-y-5" onSubmit={handleSignUp}>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 ml-1">{t.firstName}</label>
+              <div className="relative rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-card-dark overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                <input 
+                  required
+                  disabled={isLoading}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full bg-transparent border-none py-4 px-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-0 disabled:opacity-50" 
+                  placeholder="John" 
+                  type="text"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 ml-1">{t.lastName}</label>
+              <div className="relative rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-card-dark overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                <input 
+                  required
+                  disabled={isLoading}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full bg-transparent border-none py-4 px-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-0 disabled:opacity-50" 
+                  placeholder="Doe" 
+                  type="text"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 ml-1">{t.fullName}</label>
+            <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 ml-1">{t.username}</label>
             <div className="relative rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-card-dark overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">person</span>
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">alternate_email</span>
               <input 
                 required
                 disabled={isLoading}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-transparent border-none py-4 pl-12 pr-4 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-0 disabled:opacity-50" 
-                placeholder="John Doe" 
+                placeholder="johndoe" 
                 type="text"
               />
             </div>

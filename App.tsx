@@ -31,6 +31,10 @@ export const translations = {
     continueWith: "Veya şununla devam et",
     noAccount: "Hesabınız yok mu?",
     signUp: "Kaydol",
+    firstName: "Ad",
+    lastName: "Soyad",
+    username: "Kullanıcı Adı",
+    usernameOrEmail: "Kullanıcı Adı veya E-posta",
     fullName: "Ad Soyad",
     createAccount: "Hesap Oluştur",
     haveAccount: "Zaten hesabınız var mı?",
@@ -73,7 +77,12 @@ export const translations = {
     orderSummary: "Sipariş Özeti",
     error_not_found: "Kullanıcı bulunamadı.",
     error_wrong_password: "Hatalı şifre.",
-    error_generic: "Bir hata oluştu."
+    error_generic: "Bir hata oluştu.",
+    error_missing_fields: "Tüm alanlar zorunludur.",
+    error_email_in_use: "Bu e-posta adresi bu rol için zaten kullanımda.",
+    error_username_in_use: "Bu kullanıcı adı bu rol için zaten alınmış.",
+    error_invalid_credentials: "Geçersiz kullanıcı adı veya şifre.",
+    error_internal: "Sunucu hatası oluştu."
   },
   en: {
     brand: "FitTrack Connect",
@@ -90,6 +99,10 @@ export const translations = {
     continueWith: "Or continue with",
     noAccount: "Don't have an account?",
     signUp: "Sign Up",
+    firstName: "First Name",
+    lastName: "Last Name",
+    username: "Username",
+    usernameOrEmail: "Username or Email",
     fullName: "Full Name",
     createAccount: "Create Account",
     haveAccount: "Already have an account?",
@@ -132,7 +145,12 @@ export const translations = {
     orderSummary: "Order Summary",
     error_not_found: "User not found.",
     error_wrong_password: "Wrong password.",
-    error_generic: "An error occurred."
+    error_generic: "An error occurred.",
+    error_missing_fields: "All fields are required.",
+    error_email_in_use: "Email is already in use for this role.",
+    error_username_in_use: "Username is already taken for this role.",
+    error_invalid_credentials: "Invalid credentials.",
+    error_internal: "Internal server error."
   }
 };
 
