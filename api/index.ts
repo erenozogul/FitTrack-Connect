@@ -36,12 +36,40 @@ try {
         UNIQUE(role, email),
         UNIQUE(role, username)
       )
-    `.then(() => console.log("Database tables verified"))
+    `.then(() => {
+        return sql`
+          CREATE TABLE IF NOT EXISTS templates (
+            id SERIAL PRIMARY KEY,
+            trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            level VARCHAR(50) NOT NULL,
+            category VARCHAR(50),
+            duration VARCHAR(50) NOT NULL,
+            image TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+    }).then(() => console.log("Database tables verified"))
      .catch(err => console.error("Failed to initialize database tables:", err));
   }
 } catch (error) {
   console.error("Failed to initialize database tables:", error);
 }
+
+// Authentication Middleware
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) return res.status(401).json({ error: "error_unauthorized" });
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) return res.status(403).json({ error: "error_forbidden" });
+    req.user = user;
+    next();
+  });
+};
 
 // API Routes
 app.post("/api/auth/register", async (req, res) => {
@@ -130,6 +158,51 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+app.get("/api/templates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const sql = getDb();
+    const templates = await sql`
+      SELECT id, title, level, category, duration, image, updated_at as "updatedAt"
+      FROM templates
+      WHERE trainer_id = ${userId}
+      ORDER BY created_at DESC
+    `;
+    res.json(templates);
+  } catch (error) {
+    console.error("Fetch templates error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+app.post("/api/templates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const { title, level, category, duration, image } = req.body;
+
+    if (!title || !level || !duration) {
+      return res.status(400).json({ error: "error_missing_fields" });
+    }
+
+    const sql = getDb();
+    
+    // Explicitly casting values that Neon/Postgres might reject if undefined
+    const categoryParam = category || null;
+    const imageParam = image || null;
+    
+    const result = await sql`
+      INSERT INTO templates (trainer_id, title, level, category, duration, image)
+      VALUES (${userId}, ${title}, ${level}, ${categoryParam}, ${duration}, ${imageParam})
+      RETURNING id, title, level, category, duration, image, updated_at as "updatedAt"
+    `;
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error("Create template error:", error);
     res.status(500).json({ error: "error_internal" });
   }
 });

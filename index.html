@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FitTrack Connect</title>
+  <title>PTBoard</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
@@ -14,9 +14,9 @@
       theme: {
         extend: {
           colors: {
-            primary: "#007AFF",
-            "background-dark": "#0C0C0E",
-            "card-dark": "#1C1C22",
+            primary: "#0EA5E9",
+            "background-dark": "#0B2B53", // Deep vivid marine blue
+            "card-dark": "#133E70", // Lighter marine blue for cards
             "cta-orange": "#FF6600"
           },
           fontFamily: {
@@ -32,12 +32,12 @@
       -webkit-tap-highlight-color: transparent;
     }
     .dark body {
-      background-color: #0C0C0E;
+      background-color: #0B2B53;
       color: white;
     }
     body:not(.dark) {
-      background-color: #F8F9FA;
-      color: #1A1A1A;
+      background-color: #E0F2FE; /* Soft sky blue for light mode */
+      color: #0B2B53; /* Dark blue text */
     }
     ::-webkit-scrollbar {
       display: none;

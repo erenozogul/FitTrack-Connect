@@ -58,7 +58,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 bg-white dark:bg-background-dark transition-colors relative">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white dark:bg-background-dark transition-colors relative">
       {/* Back Button */}
       <button 
         onClick={() => navigate('/')}
@@ -67,7 +67,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
         <span className="material-symbols-outlined">arrow_back</span>
       </button>
 
-      <div className="w-full max-w-[440px] flex flex-col items-center pb-20 mt-12">
+      <div className="w-full max-w-[440px] flex flex-col items-center pb-20 md:pb-0">
         <div className="mb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4 border border-primary/20">
             <span className="material-symbols-outlined text-primary text-4xl fill-1">bolt</span>
@@ -76,7 +76,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
           <p className="text-slate-400 dark:text-slate-400 mt-2 font-medium">Elevate Your Training</p>
         </div>
 
-        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-cta-orange bg-cta-orange/5'}`}>
+        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-white bg-white text-[#0B2B53] dark:text-[#0B2B53]/5'}`}>
           {role === 'trainer' ? t.trainer : t.student} {t.login}
         </div>
 
@@ -128,7 +128,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-cta-orange hover:opacity-90 text-white font-black py-4 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-cta-orange/30 uppercase tracking-widest text-sm flex items-center justify-center gap-2 disabled:bg-slate-400 disabled:shadow-none"
+            className="w-full bg-white hover:opacity-90 text-[#0B2B53] font-black py-4 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-cta-orange/30 uppercase tracking-widest text-sm flex items-center justify-center gap-2 disabled:bg-slate-400 disabled:shadow-none"
           >
             {isLoading ? (
               <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

@@ -11,14 +11,14 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="h-screen flex flex-col bg-background-dark">
+    <div className="h-screen flex flex-col bg-background-dark md:pl-64">
       <header className="sticky top-0 z-10 bg-background-dark/80 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-primary/10 text-primary">
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div>
-            <h1 className="text-[8px] font-black tracking-[0.3em] text-white/30 uppercase leading-none mb-1">FitTrack Connect</h1>
+            <h1 className="text-[8px] font-black tracking-[0.3em] text-white/30 uppercase leading-none mb-1">PTBoard</h1>
             <p className="text-sm font-black uppercase italic">AI Form Analysis</p>
           </div>
         </div>
@@ -27,7 +27,7 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-44 no-scrollbar">
+      <main className="flex-1 overflow-y-auto pb-44 md:pb-32 no-scrollbar max-w-3xl mx-auto w-full">
         {/* Student Profile */}
         <section className="p-4 flex items-center gap-4 bg-card-dark border-b border-white/5">
           <div className="relative">
@@ -114,20 +114,22 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
         </section>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 pb-20 bg-background-dark border-t border-primary/20">
-        <div className="px-2 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-black text-primary/70 uppercase">Monthly Quota</span>
-            <span className="text-[9px] font-black text-white uppercase">1 / 1 Analysis Credits Used</span>
+      <footer className="fixed bottom-0 left-0 md:left-64 right-0 p-4 md:pb-4 bg-background-dark border-t border-primary/20">
+        <div className="max-w-3xl mx-auto w-full">
+          <div className="px-2 py-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-black text-primary/70 uppercase">Monthly Quota</span>
+              <span className="text-[9px] font-black text-white uppercase">1 / 1 Analysis Credits Used</span>
+            </div>
+            <div className="w-full h-1.5 bg-primary/10 rounded-full overflow-hidden">
+              <div className="h-full bg-primary w-full shadow-[0_0_10px_rgba(0,122,255,0.5)] transition-all duration-1000"></div>
+            </div>
           </div>
-          <div className="w-full h-1.5 bg-primary/10 rounded-full overflow-hidden">
-            <div className="h-full bg-primary w-full shadow-[0_0_10px_rgba(0,122,255,0.5)] transition-all duration-1000"></div>
-          </div>
+          <button className="w-full bg-white text-[#0B2B53] font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-cta-orange/20 uppercase text-xs">
+            <span className="material-symbols-outlined font-black">picture_as_pdf</span>
+            Generate PDF Report
+          </button>
         </div>
-        <button className="w-full bg-cta-orange text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-cta-orange/20 uppercase text-xs">
-          <span className="material-symbols-outlined font-black">picture_as_pdf</span>
-          Generate PDF Report
-        </button>
       </footer>
 
       {/* Fixed: Pass lang to BottomNav */}

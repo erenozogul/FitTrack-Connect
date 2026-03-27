@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 
@@ -9,9 +9,17 @@ interface ChatScreenProps {
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
   const navigate = useNavigate();
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<string[]>([]);
+
+  const handleSend = () => {
+    if(!inputText.trim()) return;
+    setMessages([...messages, inputText]);
+    setInputText('');
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-background-dark transition-colors">
+    <div className="h-screen flex flex-col bg-white dark:bg-background-dark transition-colors md:pl-64">
       <header className="flex items-center bg-white/80 dark:bg-background-dark/80 backdrop-blur-md p-4 border-b border-slate-100 dark:border-white/5 justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -38,7 +46,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar pb-44">
+      <main className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar pb-44 md:pb-24 max-w-3xl w-full mx-auto">
         <div className="flex justify-center">
           <span className="bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-white/30 text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 rounded-full border border-slate-200 dark:border-white/5">Today</span>
         </div>
@@ -79,6 +87,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
           <img src="https://picsum.photos/seed/alex/100/100" className="size-8 rounded-full shrink-0" alt="" />
         </div>
 
+        {/* Dynamic Messages */}
+        {messages.map((msg, idx) => (
+          <div key={idx} className="flex items-start gap-3 justify-end">
+            <div className="flex flex-col gap-1 max-w-[80%] items-end">
+              <div className="bg-primary text-white dark:text-background-dark font-bold rounded-2xl rounded-tr-none px-4 py-3 text-xs leading-relaxed shadow-lg shadow-primary/20">
+                {msg}
+              </div>
+              <span className="text-[8px] text-slate-400 dark:text-white/20 font-bold mr-1 uppercase">Just Now</span>
+            </div>
+            <img src="https://picsum.photos/seed/alex/100/100" className="size-8 rounded-full shrink-0" alt="" />
+          </div>
+        ))}
+
         {/* Typing */}
         <div className="flex items-center gap-2 px-1">
           <div className="flex gap-1">
@@ -90,8 +111,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 pb-24 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-white/5">
-        <div className="flex items-end gap-3 bg-slate-50 dark:bg-card-dark rounded-2xl p-2 border border-slate-200 dark:border-white/5 focus-within:border-primary/40 transition-all shadow-inner">
+      <footer className="fixed bottom-0 left-0 md:left-64 right-0 p-4 pb-24 md:pb-4 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-white/5">
+        <div className="flex items-end gap-3 bg-slate-50 dark:bg-card-dark rounded-2xl p-2 border border-slate-200 dark:border-white/5 focus-within:border-primary/40 transition-all shadow-inner max-w-3xl mx-auto w-full">
           <div className="flex flex-col gap-2 mb-1 pl-1">
             <button className="size-8 flex items-center justify-center text-slate-400 dark:text-white/20 hover:text-primary transition-colors">
               <span className="material-symbols-outlined text-[20px]">attach_file</span>
@@ -102,6 +123,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
           </div>
           <div className="flex-1 pb-2">
             <textarea 
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
               className="w-full bg-transparent border-none focus:ring-0 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 resize-none max-h-32 py-1" 
               placeholder="Type a message..." 
               rows={1}
@@ -111,7 +134,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ lang }) => {
             <button className="size-10 flex items-center justify-center text-primary hover:text-primary/70 transition-colors">
               <span className="material-symbols-outlined text-[24px]">mic</span>
             </button>
-            <button className="size-10 rounded-xl flex items-center justify-center bg-primary text-white dark:text-background-dark shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-transform">
+            <button onClick={handleSend} className="size-10 rounded-xl flex items-center justify-center bg-primary text-white dark:text-background-dark shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-transform">
               <span className="material-symbols-outlined font-black">send</span>
             </button>
           </div>

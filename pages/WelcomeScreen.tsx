@@ -37,7 +37,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectRole, lang, setLa
           <h1 className="text-[10px] font-bold tracking-[0.5em] text-slate-400 dark:text-white/40 uppercase">{t.brand}</h1>
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col md:flex-row">
           {/* Trainer Option */}
           <button 
             onClick={() => handleSelect('trainer')}
@@ -71,10 +71,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectRole, lang, setLa
             />
             <div className="absolute inset-0 bg-gradient-to-b from-white via-white/40 dark:from-background-dark dark:via-background-dark/40 to-transparent"></div>
             <div className="absolute inset-0 flex flex-col justify-center items-center p-8 text-center">
-              <div className="mb-6 w-12 h-12 rounded-full border border-slate-200 dark:border-white/20 flex items-center justify-center group-hover:bg-cta-orange group-hover:border-cta-orange transition-colors group-hover:shadow-lg">
+              <div className="mb-6 w-12 h-12 rounded-full border border-slate-200 dark:border-white/20 flex items-center justify-center group-hover:bg-white text-[#0B2B53] dark:text-[#0B2B53] group-hover:border-cta-orange transition-colors group-hover:shadow-lg">
                 <span className="material-symbols-outlined text-slate-400 group-hover:text-white rotate-180">arrow_forward</span>
               </div>
-              <span className="text-xs font-bold tracking-[0.3em] text-cta-orange mb-2 uppercase">{t.iAmA}</span>
+              <span className="text-xs font-bold tracking-[0.3em] text-white mb-2 uppercase">{t.iAmA}</span>
               <h2 className="text-3xl font-extrabold tracking-tight mb-2 group-hover:scale-110 transition-transform uppercase text-slate-900 dark:text-white">{t.student}</h2>
               <p className="text-slate-500 dark:text-white/60 text-sm max-w-[240px] opacity-0 group-hover:opacity-100 transition-opacity">{t.studentDesc}</p>
             </div>

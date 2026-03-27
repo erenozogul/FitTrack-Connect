@@ -17,7 +17,7 @@ import { UserRole } from './types';
 // Add missing error translation keys to translations object
 export const translations = {
   tr: {
-    brand: "FitTrack Connect",
+    brand: "PTBoard",
     trainer: "KİŞİSEL ANTRENÖR",
     student: "ÖĞRENCİ",
     iAmA: "BEN BİR",
@@ -85,7 +85,7 @@ export const translations = {
     error_internal: "Sunucu hatası oluştu."
   },
   en: {
-    brand: "FitTrack Connect",
+    brand: "PTBoard",
     trainer: "PERSONAL TRAINER",
     student: "STUDENT",
     iAmA: "I AM A",
@@ -182,7 +182,7 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-white dark:bg-background-dark font-sans text-slate-900 dark:text-white max-w-md mx-auto relative overflow-hidden shadow-2xl transition-colors duration-300">
+      <div className="min-h-screen bg-white dark:bg-background-dark font-sans text-slate-900 dark:text-white relative transition-colors duration-300 flex flex-col">
         <Routes>
           <Route path="/" element={<WelcomeScreen onSelectRole={(r) => setRole(r)} lang={lang} setLang={setLang} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />} />
           <Route 

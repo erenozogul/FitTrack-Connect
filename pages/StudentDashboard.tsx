@@ -14,6 +14,7 @@ interface StudentDashboardProps {
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, role, userName }) => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number>(18);
   const t = translations[lang];
 
   const handleLogoutClick = () => {
@@ -60,8 +61,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-background-dark pb-32 transition-colors">
-      <header className="flex items-center justify-between p-4 sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-100 dark:border-white/5">
+    <div className="min-h-screen bg-white dark:bg-background-dark pb-32 md:pb-0 md:pl-64 transition-colors">
+      <header className="flex items-center justify-between p-4 md:px-8 sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-3 relative">
           <button 
             onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -79,7 +80,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   <p className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest">Signed in as</p>
                   <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{profileData.email}</p>
                 </div>
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                <button onClick={() => { setShowProfileMenu(false); alert(t.settings + ' - Coming Soon!'); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                   <span className="material-symbols-outlined text-sm">settings</span>
                   {t.settings}
                 </button>
@@ -99,13 +100,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <h1 className="text-lg font-bold leading-tight text-slate-900 dark:text-white">{profileData.name}</h1>
           </div>
         </div>
-        <button className="relative p-2 rounded-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white">
+        <button onClick={() => alert('Notifications - Coming Soon!')} className="relative p-2 rounded-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white">
           <span className="material-symbols-outlined">notifications</span>
           <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-white dark:border-background-dark"></span>
         </button>
       </header>
 
-      <main className="px-4 mt-6 space-y-6">
+      <main className="px-4 md:px-8 mt-6 space-y-8 max-w-7xl mx-auto">
         {/* Weekly Schedule */}
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
@@ -113,26 +114,29 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <span className="text-[10px] text-primary font-black uppercase">{lang === 'tr' ? 'Ekim' : 'October'} 2023</span>
           </div>
           <div className="flex justify-between items-center gap-2 overflow-x-auto no-scrollbar py-1">
-            {days.map((day) => (
+            {days.map((day) => {
+              const isActive = day.num === selectedDay;
+              return (
               <div 
                 key={day.num}
-                className={`flex flex-col items-center min-w-[48px] py-3 rounded-xl border transition-all ${
-                  day.isActive 
-                  ? 'bg-primary border-primary text-white dark:text-background-dark shadow-lg shadow-primary/20' 
-                  : 'bg-slate-50 dark:bg-card-dark border-slate-100 dark:border-white/5 text-slate-900 dark:text-white'
+                onClick={() => setSelectedDay(day.num)}
+                className={`flex flex-col items-center min-w-[48px] py-3 rounded-xl border transition-all cursor-pointer ${
+                  isActive 
+                  ? 'bg-primary border-primary text-white dark:text-background-dark shadow-lg shadow-primary/20 scale-105' 
+                  : 'bg-slate-50 dark:bg-card-dark border-slate-100 dark:border-white/5 text-slate-900 dark:text-white hover:bg-white/5'
                 }`}
               >
-                <span className={`text-[8px] uppercase font-bold ${day.isActive ? 'text-white/80 dark:text-background-dark/80' : 'text-slate-400'}`}>{day.label}</span>
+                <span className={`text-[8px] uppercase font-bold ${isActive ? 'text-white/80 dark:text-white' : 'text-slate-400'}`}>{day.label}</span>
                 <span className="text-sm font-black">{day.num}</span>
               </div>
-            ))}
+            )})}
           </div>
         </section>
 
         {/* Hero Section */}
         <section>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/40 mb-3">{profileData.heroTitle}</h2>
-          <div className="relative overflow-hidden rounded-2xl aspect-[16/9] group shadow-xl">
+          <div className="relative overflow-hidden rounded-2xl aspect-[16/9] md:aspect-[21/9] lg:aspect-[3/1] group shadow-xl">
             <div 
               className="absolute inset-0 bg-cover bg-center opacity-80 dark:opacity-60 group-hover:scale-105 transition-transform duration-700"
               style={{ backgroundImage: `url('${isTrainer ? 'https://images.unsplash.com/photo-1594381898411-846e7d193883?auto=format&fit=crop&q=80&w=800' : 'https://lh3.googleusercontent.com/aida-public/AB6AXuCk6wWEzhw3jnLB_qr5kd4g1gRbYMIdoym9ZI66uFW2DA-v6zPbNfGdqWptiUWL__knkGgnjMmOth2FPtpWFI9KRgQUgs1cmnlQDddRE-iiNmf4kGa2QJ4q_QEfnQVYmdv9xuDQ1Vxxy7qiGWkTeu35C7-4rQHGWZ4VciIwEaS76Gbp6Ncbfdm3IZvBmw1DG42P8bhIaLHDAVA8Vn4ekmuvxovtDKwX1YVM7APcaAwUWJT85rT1Exf5A4m6w1GTs1da_oySIVhOP7o' }')` }}
@@ -146,7 +150,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               <h3 className="text-2xl font-black text-white mb-4 italic uppercase leading-none">{profileData.heroSub}</h3>
               <button 
                 onClick={() => navigate(isTrainer ? '/library' : '/live')}
-                className={`w-full ${isTrainer ? 'bg-primary' : 'bg-cta-orange'} hover:scale-[1.02] text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95`}
+                className={`w-full ${isTrainer ? 'bg-white text-[#0B2B53]' : 'bg-white'} hover:scale-[1.02] text-[#0B2B53] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95`}
               >
                 <span className="material-symbols-outlined text-xl">{isTrainer ? 'folder' : 'play_circle'}</span>
                 {isTrainer ? t.library : t.startWorkout}
@@ -158,7 +162,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         {/* Metrics Section */}
         <section>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/40 mb-3">{isTrainer ? lang === 'tr' ? 'Performans' : 'Performance' : t.dailyMetrics}</h2>
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-6 mb-4">
             {profileData.metrics.map((m, idx) => (
               <div key={idx} className="bg-slate-50 dark:bg-card-dark p-4 rounded-xl border border-slate-100 dark:border-white/5 shadow-sm">
                 <p className="text-[8px] font-black text-slate-400 dark:text-white/40 uppercase mb-1">{m.label}</p>

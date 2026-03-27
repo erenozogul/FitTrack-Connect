@@ -40,7 +40,7 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-background-dark pb-32 transition-colors">
+    <div className="min-h-screen bg-white dark:bg-background-dark pb-32 md:pb-0 md:pl-64 transition-colors">
       <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/5 sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
@@ -59,7 +59,7 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
           </p>
         </section>
 
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((plan) => (
             <div 
               key={plan.name}
@@ -107,7 +107,7 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
 
               <button 
                 onClick={() => navigate('/checkout')}
-                className="w-full py-3 px-4 rounded-lg bg-cta-orange hover:brightness-110 text-white font-bold transition-all shadow-lg shadow-cta-orange/20 active:scale-95"
+                className="w-full py-3 px-4 rounded-lg bg-white hover:brightness-110 text-[#0B2B53] font-bold transition-all shadow-lg shadow-cta-orange/20 active:scale-95"
               >
                 {plan.cta}
               </button>

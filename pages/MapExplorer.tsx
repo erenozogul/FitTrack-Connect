@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 
@@ -9,9 +9,10 @@ interface MapExplorerProps {
 
 const MapExplorer: React.FC<MapExplorerProps> = ({ lang }) => {
   const navigate = useNavigate();
+  const [activeFilter, setActiveFilter] = useState('Near Me');
 
   return (
-    <div className="h-screen flex flex-col relative overflow-hidden bg-white dark:bg-background-dark transition-colors">
+    <div className="h-screen flex flex-col relative overflow-hidden bg-white dark:bg-background-dark md:pl-64 transition-colors">
       {/* Map Mock */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-transparent to-white/90 dark:from-background-dark/80 dark:via-transparent dark:to-background-dark/90 pointer-events-none z-10"></div>
@@ -72,13 +73,13 @@ const MapExplorer: React.FC<MapExplorerProps> = ({ lang }) => {
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
           {[
-            { label: 'Near Me', icon: 'explore', active: true },
+            { label: 'Near Me', icon: 'explore' },
             { label: 'Gyms', icon: 'fitness_center' },
             { label: 'Trainers', icon: 'person' },
             { label: 'Studios', icon: 'self_improvement' }
           ].map((chip) => (
-            <button key={chip.label} className={`flex h-10 items-center justify-center gap-2 rounded-full px-6 whitespace-nowrap shadow-xl transition-all ${chip.active ? 'bg-primary text-white dark:text-background-dark' : 'bg-white/60 dark:bg-background-dark/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10'}`}>
-              <span className={`material-symbols-outlined text-sm ${chip.active ? 'fill-1' : ''}`}>{chip.icon}</span>
+            <button key={chip.label} onClick={() => setActiveFilter(chip.label)} className={`flex h-10 items-center justify-center gap-2 rounded-full px-6 whitespace-nowrap shadow-xl transition-all ${chip.label === activeFilter ? 'bg-primary text-white dark:text-background-dark' : 'bg-white/60 dark:bg-background-dark/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10'}`}>
+              <span className={`material-symbols-outlined text-sm ${chip.label === activeFilter ? 'fill-1' : ''}`}>{chip.icon}</span>
               <span className="text-xs font-black uppercase">{chip.label}</span>
             </button>
           ))}
@@ -94,7 +95,7 @@ const MapExplorer: React.FC<MapExplorerProps> = ({ lang }) => {
       </div>
 
       {/* Detail Card Overlay */}
-      <div className="absolute bottom-24 left-4 right-4 z-40">
+      <div className="absolute bottom-24 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-40">
         <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-3xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.2)] dark:shadow-[0_30px_60px_rgba(0,0,0,0.8)]">
           <div className="flex">
             <div className="w-32 h-40 shrink-0 relative">

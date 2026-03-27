@@ -45,7 +45,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">{t.checkout}</h1>
       </header>
 
-      <main className="p-6 space-y-8 max-w-md mx-auto">
+      <main className="p-6 md:mt-12 space-y-8 max-w-md mx-auto">
         {/* Virtual Card Visualization */}
         <div className="relative aspect-[1.6/1] w-full rounded-2xl bg-gradient-to-br from-primary to-blue-800 p-6 text-white shadow-2xl overflow-hidden group">
           <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-150 transition-transform duration-700">
@@ -53,7 +53,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
           </div>
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div className="flex justify-between items-start">
-              <span className="text-lg font-black italic tracking-tighter opacity-80">FitTrack</span>
+              <span className="text-lg font-black italic tracking-tighter opacity-80">PTBoard</span>
               <div className="flex gap-1">
                 <div className="size-8 rounded-full bg-red-500/80"></div>
                 <div className="size-8 rounded-full bg-yellow-500/80 -ml-4"></div>
@@ -139,7 +139,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
           <button 
             disabled={isProcessing}
             type="submit"
-            className={`w-full h-14 rounded-xl bg-primary text-white font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing ? 'opacity-80 cursor-wait' : 'hover:brightness-110'}`}
+            className={`w-full h-14 rounded-xl bg-white text-[#0B2B53] font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 ${isProcessing ? 'opacity-80 cursor-wait' : 'hover:brightness-110'}`}
           >
             {isProcessing ? (
               <span className="animate-spin size-5 border-2 border-white/20 border-t-white rounded-full"></span>

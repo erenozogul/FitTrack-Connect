@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 
@@ -9,6 +9,7 @@ interface LiveSessionProps {
 
 const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
   const navigate = useNavigate();
+  const [isPlaying, setIsPlaying] = useState(true);
 
   const participants = [
     { name: 'John Doe', progress: 85, bpm: 145, set: '3/3', isTop: true, avatar: 'https://picsum.photos/seed/p1/100/100' },
@@ -19,7 +20,7 @@ const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-background-dark">
+    <div className="h-screen flex flex-col bg-background-dark md:pl-64">
       <header className="flex items-center justify-between p-4 border-b border-white/5 bg-background-dark/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -39,7 +40,7 @@ const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col overflow-y-auto pb-44 no-scrollbar">
+      <main className="flex-1 flex flex-col overflow-y-auto pb-44 md:pb-32 no-scrollbar max-w-5xl mx-auto w-full">
         {/* Current Move Visualization */}
         <section className="p-4">
           <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
@@ -121,8 +122,8 @@ const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
       </main>
 
       {/* Control Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-card-dark/95 backdrop-blur-xl border-t border-primary/20 p-4 pb-20 shadow-2xl">
-        <div className="flex flex-col gap-4">
+      <footer className="fixed bottom-0 left-0 md:left-64 right-0 bg-card-dark/95 backdrop-blur-xl border-t border-primary/20 p-4 md:pb-4 shadow-2xl">
+        <div className="max-w-5xl mx-auto w-full flex flex-col gap-4">
           <div className="flex gap-4 justify-between items-center px-2">
             <div className="text-center">
               <p className="text-[8px] text-white/40 uppercase font-black">Avg. Intensity</p>
@@ -136,12 +137,12 @@ const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
             <div className="h-6 w-px bg-white/10"></div>
             <div className="flex gap-2">
               <button className="size-10 rounded-full border border-white/10 flex items-center justify-center text-white/40"><span className="material-symbols-outlined text-xl">skip_previous</span></button>
-              <button className="size-10 rounded-full bg-white text-background-dark flex items-center justify-center shadow-lg"><span className="material-symbols-outlined font-black">pause</span></button>
+              <button onClick={() => setIsPlaying(!isPlaying)} className="size-10 rounded-full bg-white text-background-dark flex items-center justify-center shadow-lg transition-transform active:scale-90"><span className="material-symbols-outlined font-black">{isPlaying ? 'pause' : 'play_arrow'}</span></button>
             </div>
           </div>
           <button 
             onClick={() => navigate('/analysis')}
-            className="w-full h-12 rounded-xl bg-cta-orange text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-cta-orange/20"
+            className="w-full h-12 rounded-xl bg-white text-[#0B2B53] flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-cta-orange/20"
           >
             <span className="material-symbols-outlined font-bold">skip_next</span>
             Next Move
