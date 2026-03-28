@@ -331,14 +331,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
           </section>
         )}
 
-        {/* Hero Section */}
+        {/* Hero Section — student only */}
+        {!isTrainer && (
         <section>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
-            {isTrainer ? profileData.heroTitle : (daySchedule.type === 'off' ? (lang === 'tr' ? 'Günün Durumu' : 'Day Status') : t.todaysWorkout)}
+            {daySchedule.type === 'off' ? (lang === 'tr' ? 'Günün Durumu' : 'Day Status') : t.todaysWorkout}
           </h2>
 
           {/* Student Off Day Card */}
-          {!isTrainer && daySchedule.type === 'off' ? (
+          {daySchedule.type === 'off' ? (
             <div className="rounded-2xl bg-card-dark border border-white/5 overflow-hidden shadow-xl">
               <div className="flex flex-col items-center justify-center py-12 px-6 gap-4">
                 <div className="size-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -370,34 +371,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <div className="relative overflow-hidden rounded-2xl aspect-[16/9] md:aspect-[21/9] lg:aspect-[3/1] group shadow-xl">
               <div
                 className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-105 transition-transform duration-700"
-                style={{ backgroundImage: `url('${isTrainer ? 'https://images.unsplash.com/photo-1594381898411-846e7d193883?auto=format&fit=crop&q=80&w=800' : daySchedule.image}')` }}
+                style={{ backgroundImage: `url('${daySchedule.image}')` }}
               ></div>
               <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-transparent to-transparent"></div>
               <div className="absolute bottom-0 left-0 p-5 w-full">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`px-2 py-0.5 rounded text-white text-[8px] font-black uppercase ${daySchedule.type === 'cardio' ? 'bg-cta-orange' : 'bg-primary'}`}>
-                    {isTrainer ? selectedStudent.plan : daySchedule.category[lang]}
+                    {daySchedule.category[lang]}
                   </span>
                   <span className="text-white/90 text-[10px] font-medium">
-                    {isTrainer
-                      ? `${selectedStudent.progress}% ${lang === 'tr' ? 'ilerleme' : 'progress'}`
-                      : `${daySchedule.duration} ${t.mins} • ${daySchedule.level[lang]}`}
+                    {`${daySchedule.duration} ${t.mins} • ${daySchedule.level[lang]}`}
                   </span>
                 </div>
                 <h3 className="text-2xl font-black text-white mb-4 italic uppercase leading-none">
-                  {isTrainer ? selectedStudent.name : daySchedule.title[lang]}
+                  {daySchedule.title[lang]}
                 </h3>
                 <button
-                  onClick={() => isTrainer ? navigate('/plans') : setShowWorkoutModal(true)}
+                  onClick={() => setShowWorkoutModal(true)}
                   className="w-full bg-white hover:scale-[1.02] text-[#0B2B53] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-xl">{isTrainer ? 'event_note' : 'play_circle'}</span>
-                  {isTrainer ? t.viewPlan : t.startWorkout}
+                  <span className="material-symbols-outlined text-xl">play_circle</span>
+                  {t.startWorkout}
                 </button>
               </div>
             </div>
           )}
         </section>
+        )}
 
         {/* Metrics Section */}
         <section>
