@@ -91,9 +91,16 @@ const weekSchedule: Record<number, DaySchedule> = {
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, role, userName }) => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
+  // Read real user data from localStorage
+  const storedUser = (() => { try { return JSON.parse(localStorage.getItem('fittrack_user') || '{}'); } catch { return {}; } })();
+  const storedAvatar = localStorage.getItem('fittrack_avatar') || null;
+  const realEmail = storedUser.email || (role === 'trainer' ? "coach@fittrack.com" : "user@fittrack.com");
+  const realAvatar = storedAvatar || (role === 'trainer' ? "https://picsum.photos/seed/mike/100/100" : "https://picsum.photos/seed/alex/100/100");
 
   // Schedule state with localStorage overrides
   const [schedule, setSchedule] = useState<Record<number, DaySchedule>>(() => {
@@ -146,8 +153,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   // Dynamic Content Data
   const profileData = isTrainer ? {
     name: displayUserName,
-    email: "coach.mike@fittrack.com",
-    avatar: "https://picsum.photos/seed/mike/100/100",
+    email: realEmail,
+    avatar: realAvatar,
     roleLabel: t.trainer,
     metrics: [
       { label: t.activeStudents, value: String(mockStudents.length), unit: "" },
@@ -157,8 +164,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     heroSub: selectedStudent.name
   } : {
     name: displayUserName,
-    email: "alex.rivera@fittrack.com",
-    avatar: "https://picsum.photos/seed/alex/100/100",
+    email: realEmail,
+    avatar: realAvatar,
     roleLabel: t.student,
     metrics: [
       { label: t.weight, value: localStorage.getItem('fittrack_weight') || '', unit: localStorage.getItem('fittrack_weight') ? "kg" : "" },
@@ -209,7 +216,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{t.signedInAs}</p>
                   <p className="text-xs font-bold text-white truncate">{profileData.email}</p>
                 </div>
-                <button onClick={() => { setShowProfileMenu(false); alert(t.settings + ' - ' + t.comingSoon); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors">
+                <button onClick={() => { setShowProfileMenu(false); navigate('/profile'); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-white hover:bg-white/5 transition-colors">
                   <span className="material-symbols-outlined text-sm">settings</span>
                   {t.settings}
                 </button>
@@ -229,10 +236,31 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <h1 className="text-lg font-bold leading-tight text-white">{profileData.name}</h1>
           </div>
         </div>
-        <button onClick={() => alert(t.notifications + ' - ' + t.comingSoon)} className="relative p-2 rounded-full bg-white/5 text-white">
-          <span className="material-symbols-outlined">notifications</span>
-          <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-white dark:border-background-dark"></span>
-        </button>
+        <div className="relative">
+          <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors">
+            <span className="material-symbols-outlined">notifications</span>
+            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-background-dark"></span>
+          </button>
+          {showNotifications && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)}></div>
+              <div className="absolute top-12 right-0 w-72 bg-card-dark border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden">
+                <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                  <p className="text-xs font-black text-white uppercase tracking-widest">{lang === 'tr' ? 'Bildirimler' : 'Notifications'}</p>
+                  <button onClick={() => setShowNotifications(false)} className="text-white/30 hover:text-white">
+                    <span className="material-symbols-outlined text-base">close</span>
+                  </button>
+                </div>
+                <div className="flex flex-col items-center justify-center py-10 px-4 gap-3">
+                  <span className="material-symbols-outlined text-4xl text-white/20">notifications_off</span>
+                  <p className="text-white/40 text-xs font-medium text-center">
+                    {lang === 'tr' ? 'Henüz bildirim yok' : 'No notifications yet'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       <main className="px-4 md:px-8 mt-6 space-y-8 max-w-7xl mx-auto">
