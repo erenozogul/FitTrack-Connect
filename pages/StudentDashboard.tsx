@@ -91,7 +91,7 @@ const weekSchedule: Record<number, DaySchedule> = {
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, role, userName }) => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<number>(16);
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
 
@@ -105,9 +105,30 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
 
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ title: '', type: 'workout' as DayType, duration: 0, category: '' });
+  const [showDayAssignments, setShowDayAssignments] = useState(false);
+
+  const loadAssignments = (): Record<string, Array<{ studentId: number; studentName: string; workoutId: string; workoutName: string }>> => {
+    try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
+  };
+
+  const getDayDateKey = (dayNum: number) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-${dayNum.toString().padStart(2, '0')}`;
+  };
 
   const t = translations[lang];
-  const daySchedule = schedule[selectedDay];
+
+  const defaultDaySchedule: DaySchedule = {
+    type: 'off',
+    title: { tr: 'Dinlenme Günü', en: 'Rest Day' },
+    category: { tr: 'Off', en: 'Off' },
+    level: { tr: '', en: '' },
+    duration: 0,
+    image: '',
+  };
+  const daySchedule = schedule[selectedDay] ?? defaultDaySchedule;
 
   const handleLogoutClick = () => {
     onLogout();
@@ -121,9 +142,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const handleDayClick = (dayNum: number) => {
     setSelectedDay(dayNum);
     if (isTrainer) {
-      const d = schedule[dayNum];
-      setEditingDay(dayNum);
-      setEditForm({ title: d.title[lang], type: d.type, duration: d.duration, category: d.category[lang] });
+      setShowDayAssignments(true);
     }
   };
 
@@ -145,22 +164,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     avatar: "https://picsum.photos/seed/alex/100/100",
     roleLabel: t.student,
     metrics: [
-      { label: t.weight, value: "82.4", unit: "kg" },
-      { label: t.bodyFat, value: "14.2", unit: "%" }
+      { label: t.weight, value: localStorage.getItem('fittrack_weight') || '', unit: localStorage.getItem('fittrack_weight') ? "kg" : "" },
+      { label: t.bodyFat, value: "", unit: "" }
     ],
     heroTitle: t.todaysWorkout,
     heroSub: t.legDayDestroyer
   };
 
-  const days = [
-    { label: lang === 'tr' ? 'Pzt' : 'Mon', num: 16 },
-    { label: lang === 'tr' ? 'Sal' : 'Tue', num: 17 },
-    { label: lang === 'tr' ? 'Çar' : 'Wed', num: 18 },
-    { label: lang === 'tr' ? 'Per' : 'Thu', num: 19 },
-    { label: lang === 'tr' ? 'Cum' : 'Fri', num: 20 },
-    { label: lang === 'tr' ? 'Cmt' : 'Sat', num: 21 },
-    { label: lang === 'tr' ? 'Paz' : 'Sun', num: 22 },
-  ];
+  const dayLabels = lang === 'tr'
+    ? ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Generate 7-day strip starting from Monday of current week
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sun,1=Mon,...6=Sat
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return { label: dayLabels[i], num: d.getDate() };
+  });
 
   const dayDotColor: Record<DayType, string> = {
     workout: 'bg-primary',
@@ -219,7 +243,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40">{t.weeklySchedule}</h2>
-            <span className="text-[10px] text-primary font-black uppercase">{t.october} 2023</span>
+            <span className="text-[10px] text-primary font-black uppercase">
+              {new Date().toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'long', year: 'numeric' }).toUpperCase()}
+            </span>
           </div>
           <div className="flex justify-between items-center gap-2 overflow-x-auto no-scrollbar py-1">
             {days.map((day) => {
@@ -236,14 +262,25 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                 >
                   <span className={`text-[8px] uppercase font-bold ${isActive ? 'text-white/80' : 'text-white/40'}`}>{day.label}</span>
                   <span className="text-sm font-black">{day.num}</span>
-                  <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[schedule[day.num].type]}`}></span>
+                  {isTrainer ? (
+                    (() => {
+                      const count = (loadAssignments()[getDayDateKey(day.num)] || []).length;
+                      return count > 0 ? (
+                        <span className="text-[8px] font-black text-primary mt-0.5">{count}</span>
+                      ) : (
+                        <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : 'bg-white/10'}`}></span>
+                      );
+                    })()
+                  ) : (
+                    <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[schedule[day.num].type]}`}></span>
+                  )}
                 </div>
               );
             })}
           </div>
           {isTrainer && (
             <p className="text-white/20 text-[9px] text-center mt-2">
-              {lang === 'tr' ? 'Düzenlemek için tıkla' : 'Tap a day to edit'}
+              {lang === 'tr' ? 'Seansları görmek için tıkla' : 'Tap a day to view sessions'}
             </p>
           )}
         </section>
@@ -324,8 +361,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               <div key={idx} className="bg-card-dark p-4 rounded-xl border border-white/5 shadow-sm">
                 <p className="text-[8px] font-black text-white/40 uppercase mb-1">{m.label}</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black tracking-tighter text-white">{m.value}</span>
-                  <span className="text-[10px] text-white/30 font-bold uppercase">{m.unit}</span>
+                  <span className={`text-2xl font-black tracking-tighter ${m.value ? 'text-white' : 'text-white/20'}`}>
+                    {m.value || '—'}
+                  </span>
+                  {m.value && <span className="text-[10px] text-white/30 font-bold uppercase">{m.unit}</span>}
                 </div>
               </div>
             ))}
@@ -370,6 +409,80 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               <span className="material-symbols-outlined">play_circle</span>
               {lang === 'tr' ? 'Antrenmanı Başlat' : 'Start Workout'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Trainer Day Assignments Modal */}
+      {isTrainer && showDayAssignments && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowDayAssignments(false)}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black text-white">
+                  {lang === 'tr' ? `${selectedDay} Mart` : `March ${selectedDay}`}
+                </h2>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {(() => {
+                    const assignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
+                    return assignments.length > 0
+                      ? `${assignments.length} ${lang === 'tr' ? 'seans' : 'session'}`
+                      : lang === 'tr' ? 'Seans yok' : 'No sessions';
+                  })()}
+                </p>
+              </div>
+              <button onClick={() => setShowDayAssignments(false)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {(() => {
+              const assignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
+              if (assignments.length === 0) {
+                return (
+                  <div className="flex flex-col items-center gap-3 py-6">
+                    <div className="size-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl text-white/20">event_busy</span>
+                    </div>
+                    <p className="text-white/30 text-sm font-semibold text-center">
+                      {lang === 'tr' ? 'Bu gün için seans atanmamış' : 'No sessions assigned for this day'}
+                    </p>
+                    <button
+                      onClick={() => { setShowDayAssignments(false); navigate('/library'); }}
+                      className="mt-2 px-5 py-2.5 bg-primary text-white rounded-xl font-black text-xs flex items-center gap-2 hover:bg-primary/90 active:scale-95 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      {lang === 'tr' ? 'Seans Ata' : 'Assign Session'}
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex flex-col gap-3">
+                  {assignments.map((a, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-white/5 rounded-xl p-3.5">
+                      <img
+                        src={`https://picsum.photos/seed/${a.studentName.split(' ')[0].toLowerCase()}/100/100`}
+                        alt={a.studentName}
+                        className="size-10 rounded-full object-cover border border-white/10"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-white">{a.studentName}</p>
+                        <p className="text-xs text-primary font-semibold mt-0.5">{a.workoutName}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-white/20 text-lg">fitness_center</span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => { setShowDayAssignments(false); navigate('/library'); }}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-primary/30 text-primary text-sm font-black hover:bg-primary/10 active:scale-95 transition-all mt-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    {lang === 'tr' ? 'Seans Ekle' : 'Add Session'}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

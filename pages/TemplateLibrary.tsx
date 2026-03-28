@@ -911,6 +911,38 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const userPlan: string = currentUser?.plan || 'bronze';
   const hasPremiumAccess = userPlan === 'silver' || userPlan === 'gold';
 
+  const isTrainer = role === 'trainer';
+  const [assignTarget, setAssignTarget] = useState<BodyPart | null>(null);
+  const [assignStudentId, setAssignStudentId] = useState<number>(1);
+  const [assignDate, setAssignDate] = useState<string>(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  });
+  const [assignStudentDropdown, setAssignStudentDropdown] = useState(false);
+  const [assignSuccess, setAssignSuccess] = useState(false);
+
+  const mockStudents = [
+    { id: 1, name: 'Ayşe Kaya' },
+    { id: 2, name: 'Mehmet Yılmaz' },
+    { id: 3, name: 'Zeynep Şahin' },
+    { id: 4, name: 'Can Öztürk' },
+    { id: 5, name: 'Selin Arslan' },
+  ];
+
+  const handleAssign = () => {
+    const student = mockStudents.find(s => s.id === assignStudentId);
+    if (!student || !assignTarget) return;
+    try {
+      const existing = JSON.parse(localStorage.getItem('fittrack_assignments') || '{}');
+      const key = assignDate;
+      const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang] };
+      existing[key] = [...(existing[key] || []), newEntry];
+      localStorage.setItem('fittrack_assignments', JSON.stringify(existing));
+    } catch { /* ignore */ }
+    setAssignSuccess(true);
+    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); }, 1200);
+  };
+
   const handleLogoutClick = () => { onLogout(); window.location.hash = '#/'; };
 
   return (
@@ -976,22 +1008,31 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
         {!selectedBodyPart && (
           <div className="grid grid-cols-2 gap-4">
             {bodyParts.map((bp) => (
-              <button
-                key={bp.id}
-                onClick={() => setSelectedBodyPart(bp)}
-                className={`group relative overflow-hidden rounded-2xl border ${bp.color} p-6 flex flex-col items-center gap-4 text-center hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg`}
-              >
-                <div className={`size-16 rounded-2xl ${bp.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                  <span className={`material-symbols-outlined text-4xl ${bp.textColor}`}>{bp.icon}</span>
-                </div>
-                <div>
-                  <h2 className={`text-base font-black uppercase tracking-tight text-white`}>{bp.name[lang]}</h2>
-                  <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${bp.textColor} opacity-70`}>
-                    {bp.exercises.length} {lang === 'tr' ? 'egzersiz' : 'exercises'}
-                  </p>
-                </div>
-                <span className={`material-symbols-outlined text-white/20 group-hover:${bp.textColor} group-hover:translate-x-1 transition-all absolute bottom-4 right-4`}>arrow_forward_ios</span>
-              </button>
+              <div key={bp.id} className={`group relative overflow-hidden rounded-2xl border ${bp.color} flex flex-col shadow-lg`}>
+                <button
+                  onClick={() => setSelectedBodyPart(bp)}
+                  className="flex flex-col items-center gap-4 text-center p-6 hover:scale-[1.01] active:scale-[0.98] transition-all flex-1"
+                >
+                  <div className={`size-16 rounded-2xl ${bp.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                    <span className={`material-symbols-outlined text-4xl ${bp.textColor}`}>{bp.icon}</span>
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black uppercase tracking-tight text-white">{bp.name[lang]}</h2>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${bp.textColor} opacity-70`}>
+                      {bp.exercises.length} {lang === 'tr' ? 'egzersiz' : 'exercises'}
+                    </p>
+                  </div>
+                </button>
+                {isTrainer && (
+                  <button
+                    onClick={() => { setAssignTarget(bp); setAssignSuccess(false); }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 border-t border-white/10 text-xs font-black text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">person_add</span>
+                    {lang === 'tr' ? 'Öğrenciye Ata' : 'Assign to Student'}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -1096,18 +1137,105 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
             </div>
 
             {/* CTA */}
-            <button
-              onClick={() => window.location.hash = '#/live'}
-              className="w-full bg-primary text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
-              <span className="material-symbols-outlined">play_circle</span>
-              {lang === 'tr' ? 'Antrenmanı Başlat' : 'Start Workout'}
-            </button>
+            <div className="flex flex-col gap-3">
+              {isTrainer && selectedBodyPart && (
+                <button
+                  onClick={() => { setAssignTarget(selectedBodyPart); setAssignSuccess(false); }}
+                  className="w-full bg-cta-orange text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <span className="material-symbols-outlined">person_add</span>
+                  {lang === 'tr' ? 'Öğrenciye Ata' : 'Assign to Student'}
+                </button>
+              )}
+              {!isTrainer && (
+                <button
+                  onClick={() => window.location.hash = '#/live'}
+                  className="w-full bg-primary text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <span className="material-symbols-outlined">play_circle</span>
+                  {lang === 'tr' ? 'Antrenmanı Başlat' : 'Start Workout'}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </main>
 
       <BottomNav role={role} lang={lang} />
+
+      {/* Assign to Student Modal */}
+      {assignTarget && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setAssignTarget(null)}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black text-white">{lang === 'tr' ? 'Öğrenciye Ata' : 'Assign to Student'}</h2>
+                <p className="text-xs text-primary mt-0.5 font-semibold">{assignTarget.name[lang]}</p>
+              </div>
+              <button onClick={() => setAssignTarget(null)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {assignSuccess ? (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <div className="size-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl text-green-400">check_circle</span>
+                </div>
+                <p className="text-white font-black">{lang === 'tr' ? 'Başarıyla Atandı!' : 'Successfully Assigned!'}</p>
+              </div>
+            ) : (
+              <>
+                {/* Student selector */}
+                <div className="relative">
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Öğrenci' : 'Student'}</p>
+                  <button
+                    type="button"
+                    onClick={() => setAssignStudentDropdown(v => !v)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm flex items-center justify-between"
+                  >
+                    <span>{mockStudents.find(s => s.id === assignStudentId)?.name}</span>
+                    <span className="material-symbols-outlined text-white/50 text-base">{assignStudentDropdown ? 'expand_less' : 'expand_more'}</span>
+                  </button>
+                  {assignStudentDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl">
+                      {mockStudents.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => { setAssignStudentId(s.id); setAssignStudentDropdown(false); }}
+                          className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${assignStudentId === s.id ? 'bg-primary text-white' : 'text-white hover:bg-white/10'}`}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Date picker */}
+                <div>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Tarih' : 'Date'}</p>
+                  <input
+                    type="date"
+                    value={assignDate}
+                    onChange={e => setAssignDate(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
+                  />
+                </div>
+
+                <button
+                  onClick={handleAssign}
+                  className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined">event_available</span>
+                  {lang === 'tr' ? 'Ata' : 'Assign'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

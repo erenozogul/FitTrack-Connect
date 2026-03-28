@@ -62,6 +62,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [firstName, setFirstName] = useState(parsedUser.firstName || '');
   const [lastName, setLastName] = useState(parsedUser.lastName || '');
   const [email, setEmail] = useState(parsedUser.email || '');
+  const [weight, setWeight] = useState(localStorage.getItem('fittrack_weight') || '');
   const [infoSaved, setInfoSaved] = useState(false);
 
   const [currentPw, setCurrentPw] = useState('');
@@ -83,6 +84,11 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
     if (!firstName.trim() || !lastName.trim() || !email.trim()) return;
     const updated = { ...parsedUser, firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim() };
     localStorage.setItem('fittrack_user', JSON.stringify(updated));
+    if (weight.trim()) {
+      localStorage.setItem('fittrack_weight', weight.trim());
+    } else {
+      localStorage.removeItem('fittrack_weight');
+    }
     setInfoSaved(true);
     setTimeout(() => { setInfoSaved(false); setActiveModal(null); }, 1000);
   };
@@ -249,7 +255,9 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
             </p>
           </div>
           <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center transition-colors">
-            <p className="text-2xl font-black text-slate-900 dark:text-white">{isTrainer ? '4.9 ⭐' : '82.4 kg'}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">
+              {isTrainer ? '4.9 ⭐' : (weight ? `${weight} kg` : '—')}
+            </p>
             <p className="text-[10px] text-slate-500 dark:text-white/40 uppercase mt-1">
               {isTrainer ? (lang === 'tr' ? 'Değerlendirme' : 'Rating') : (lang === 'tr' ? 'Güncel Kilo' : 'Current Weight')}
             </p>
@@ -421,6 +429,21 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
               <p className={labelCls}>{t.email}</p>
               <input className={inputCls} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t.email} />
             </div>
+            {!isTrainer && (
+              <div>
+                <p className={labelCls}>{lang === 'tr' ? 'Kilo (kg)' : 'Weight (kg)'}</p>
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="30"
+                  max="300"
+                  step="0.1"
+                  value={weight}
+                  onChange={e => setWeight(e.target.value)}
+                  placeholder={lang === 'tr' ? 'Örn: 75.5' : 'e.g. 75.5'}
+                />
+              </div>
+            )}
             <button
               onClick={savePersonalInfo}
               className="w-full bg-primary text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all"
