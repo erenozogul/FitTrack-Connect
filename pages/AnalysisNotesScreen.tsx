@@ -102,6 +102,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
   const [showAddModal, setShowAddModal] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState<Note['category']>('general');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   const filteredNotes = activeFilter === 'all' ? notes : notes.filter(n => n.category === activeFilter);
 
@@ -254,20 +255,44 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
               </button>
             </div>
 
-            <div>
+            <div className="relative">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">
                 {lang === 'tr' ? 'Kategori' : 'Category'}
               </p>
-              <select
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value as Note['category'])}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 appearance-none"
+              <button
+                type="button"
+                onClick={() => setShowCategoryDropdown(v => !v)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 flex items-center justify-between"
               >
-                <option value="form">{lang === 'tr' ? 'Form' : 'Form'}</option>
-                <option value="nutrition">{lang === 'tr' ? 'Beslenme' : 'Nutrition'}</option>
-                <option value="progress">{lang === 'tr' ? 'İlerleme' : 'Progress'}</option>
-                <option value="general">{lang === 'tr' ? 'Genel' : 'General'}</option>
-              </select>
+                <span>
+                  {newCategory === 'form' && (lang === 'tr' ? 'Form' : 'Form')}
+                  {newCategory === 'nutrition' && (lang === 'tr' ? 'Beslenme' : 'Nutrition')}
+                  {newCategory === 'progress' && (lang === 'tr' ? 'İlerleme' : 'Progress')}
+                  {newCategory === 'general' && (lang === 'tr' ? 'Genel' : 'General')}
+                </span>
+                <span className="material-symbols-outlined text-white/50 text-base">
+                  {showCategoryDropdown ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+              {showCategoryDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl">
+                  {[
+                    { value: 'form', label: lang === 'tr' ? 'Form' : 'Form' },
+                    { value: 'nutrition', label: lang === 'tr' ? 'Beslenme' : 'Nutrition' },
+                    { value: 'progress', label: lang === 'tr' ? 'İlerleme' : 'Progress' },
+                    { value: 'general', label: lang === 'tr' ? 'Genel' : 'General' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setNewCategory(opt.value as Note['category']); setShowCategoryDropdown(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${newCategory === opt.value ? 'bg-primary text-white' : 'text-white hover:bg-white/10'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
