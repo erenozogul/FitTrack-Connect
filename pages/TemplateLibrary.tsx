@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
+import { addNotification } from '../utils/notifications';
 
 interface Exercise {
   id: string;
@@ -940,6 +941,11 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
       const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang], startTime: assignStartTime, endTime: assignEndTime };
       existing[key] = [...(existing[key] || []), newEntry];
       localStorage.setItem('fittrack_assignments', JSON.stringify(existing));
+      addNotification({
+        type: 'assignment',
+        title: lang === 'tr' ? 'Yeni Antrenman Atandı' : 'New Workout Assigned',
+        body: `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
+      });
     } catch { /* ignore */ }
     setAssignSuccess(true);
     setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); }, 1200);

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
+import { addNotification } from '../utils/notifications';
 
 interface Note {
   id: string;
@@ -161,6 +162,12 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
     const updated = [newNote, ...trainerNotes];
     setTrainerNotes(updated);
     saveTrainerNotes(selectedStudentId, updated);
+    const studentName = mockStudents.find(s => s.id === selectedStudentId)?.name || '';
+    addNotification({
+      type: 'note',
+      title: lang === 'tr' ? 'Yeni Not Eklendi' : 'New Note Added',
+      body: `${studentName}: ${newContent.slice(0, 60)}${newContent.length > 60 ? '…' : ''}`,
+    });
     setNewContent('');
     setNewCategory('general');
     setShowAddModal(false);

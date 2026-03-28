@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
 import { translations } from '../App';
+import { addNotification } from '../utils/notifications';
 
 interface SignUpScreenProps {
   role: UserRole;
@@ -21,6 +22,15 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [inviteCode, setInviteCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+
+  const mockTrainers = [
+    { id: 1, name: 'Coach Mike', specialty: lang === 'tr' ? 'Güç & Kondisyon' : 'Strength & Conditioning', avatar: 'https://picsum.photos/seed/mike/100/100', code: 'MIKE2026', students: 12, rating: '4.9' },
+    { id: 2, name: 'Coach Sara', specialty: lang === 'tr' ? 'Fonksiyonel Antrenman' : 'Functional Training', avatar: 'https://picsum.photos/seed/sara/100/100', code: 'SARA2026', students: 8, rating: '4.7' },
+    { id: 3, name: 'Coach Ahmet', specialty: lang === 'tr' ? 'Hipertrofi & Beslenme' : 'Hypertrophy & Nutrition', avatar: 'https://picsum.photos/seed/ahmet/100/100', code: 'AHMET2026', students: 15, rating: '4.8' },
+  ];
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,13 +58,132 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
       localStorage.setItem('fittrack_gender', gender);
 
       onSignUp(`${firstName} ${lastName}`);
-      navigate(role === 'trainer' ? '/library' : '/dashboard');
+      if (role === 'trainer') {
+        navigate('/library');
+      } else {
+        setIsLoading(false);
+        setStep(2);
+        return;
+      }
     } catch {
       setError(lang === 'tr' ? 'Bir hata oluştu. Lütfen tekrar deneyin.' : 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSelectTrainer = (trainer: typeof mockTrainers[number]) => {
+    localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
+    addNotification({
+      type: 'system',
+      title: lang === 'tr' ? `${trainer.name} ile bağlantı kuruldu!` : `Connected with ${trainer.name}!`,
+      body: lang === 'tr' ? 'Antrenörünüz sizin için program oluşturabilir ve sizi takip edebilir.' : 'Your trainer can now create programs and track your progress.',
+    });
+    navigate('/dashboard');
+  };
+
+  const handleConnectByCode = () => {
+    setCodeError('');
+    const found = mockTrainers.find(tr => tr.code === inviteCode.trim().toUpperCase());
+    if (!found) {
+      setCodeError(lang === 'tr' ? 'Geçersiz davet kodu' : 'Invalid invite code');
+      return;
+    }
+    handleSelectTrainer(found);
+  };
+
+  if (step === 2) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-background-dark transition-colors duration-300 relative">
+        <div className="w-full max-w-[440px] flex flex-col items-center pb-20 md:pb-0">
+          {/* Header */}
+          <div className="mb-6 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4 border border-primary/20">
+              <span className="material-symbols-outlined text-primary text-4xl">bolt</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cta-orange/10 border border-cta-orange/20 mb-3">
+              <span className="text-cta-orange text-xs font-black uppercase tracking-widest">
+                {lang === 'tr' ? 'Adım 2/2' : 'Step 2/2'}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              {lang === 'tr' ? 'Antrenörünü Seç' : 'Choose Your Trainer'}
+            </h1>
+            <p className="text-slate-500 dark:text-white/40 text-sm mt-2">
+              {lang === 'tr'
+                ? 'İsterseniz şimdi atla, daha sonra profilinden bağlanabilirsin'
+                : 'You can skip this and connect later from your profile'}
+            </p>
+          </div>
+
+          {/* Invite Code Section */}
+          <div className="w-full mb-4 bg-white dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-2xl p-4">
+            <p className="text-[10px] font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-3">
+              {lang === 'tr' ? 'Davet Kodu ile Bağlan' : 'Connect with Invite Code'}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={e => { setInviteCode(e.target.value); setCodeError(''); }}
+                placeholder={lang === 'tr' ? 'Davet kodunu girin' : 'Enter invite code'}
+                className="flex-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:border-primary"
+              />
+              <button
+                onClick={handleConnectByCode}
+                className="px-4 py-3 bg-primary text-white font-bold text-sm rounded-xl hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                {lang === 'tr' ? 'Bağlan' : 'Connect'}
+              </button>
+            </div>
+            {codeError && (
+              <p className="text-red-500 text-xs mt-2 font-semibold">{codeError}</p>
+            )}
+          </div>
+
+          {/* Trainer List */}
+          <div className="w-full mb-4">
+            <p className="text-[10px] font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 px-1">
+              {lang === 'tr' ? 'Antrenör Listesi' : 'Trainer List'}
+            </p>
+            <div className="flex flex-col gap-3">
+              {mockTrainers.map(trainer => (
+                <div
+                  key={trainer.id}
+                  className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-2xl p-4 flex items-center gap-3"
+                >
+                  <img src={trainer.avatar} alt={trainer.name} className="size-12 rounded-full object-cover border-2 border-primary/20" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-900 dark:text-white font-bold text-sm">{trainer.name}</p>
+                    <p className="text-slate-500 dark:text-white/40 text-xs">{trainer.specialty}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] text-yellow-500 font-bold">★ {trainer.rating}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-white/30">{trainer.students} {lang === 'tr' ? 'öğrenci' : 'students'}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleSelectTrainer(trainer)}
+                    className="px-3 py-2 bg-primary/10 border border-primary/30 text-primary font-bold text-xs rounded-xl hover:bg-primary/20 active:scale-95 transition-all"
+                  >
+                    {lang === 'tr' ? 'Seç' : 'Select'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Skip Button */}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="w-full py-3 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 font-bold text-sm rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 transition-all"
+          >
+            {lang === 'tr' ? 'Şimdi Atla' : 'Skip for Now'}
+          </button>
+        </div>
+        <div className="fixed -z-10 top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-96 bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-background-dark transition-colors duration-300 relative">

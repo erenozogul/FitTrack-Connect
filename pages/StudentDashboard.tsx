@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
+import { getNotifications, getUnreadCount, markAllRead, AppNotification } from '../utils/notifications';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -92,9 +93,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationsList, setNotificationsList] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
+  useEffect(() => {
+    setNotificationsList(getNotifications());
+    setUnreadCount(getUnreadCount());
+  }, []);
 
   // Read real user data from localStorage
   const storedUser = (() => { try { return JSON.parse(localStorage.getItem('fittrack_user') || '{}'); } catch { return {}; } })();
@@ -237,9 +245,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
           </div>
         </div>
         <div className="relative">
-          <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors">
+          <button
+            onClick={() => {
+              const opening = !showNotifications;
+              setShowNotifications(opening);
+              if (opening) {
+                markAllRead();
+                setNotificationsList(getNotifications());
+                setUnreadCount(0);
+              }
+            }}
+            className="relative p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors"
+          >
             <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border-2 border-background-dark"></span>
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 size-2 bg-primary rounded-full border border-background-dark"></span>
+            )}
           </button>
           {showNotifications && (
             <>
@@ -251,12 +272,31 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                     <span className="material-symbols-outlined text-base">close</span>
                   </button>
                 </div>
-                <div className="flex flex-col items-center justify-center py-10 px-4 gap-3">
-                  <span className="material-symbols-outlined text-4xl text-white/20">notifications_off</span>
-                  <p className="text-white/40 text-xs font-medium text-center">
-                    {lang === 'tr' ? 'Henüz bildirim yok' : 'No notifications yet'}
-                  </p>
-                </div>
+                {notificationsList.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 gap-3">
+                    <span className="material-symbols-outlined text-4xl text-white/20">notifications_off</span>
+                    <p className="text-white/40 text-xs font-medium text-center">
+                      {lang === 'tr' ? 'Henüz bildirim yok' : 'No notifications yet'}
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-white/5 max-h-80 overflow-y-auto">
+                    {notificationsList.map(n => {
+                      const iconMap = { assignment: 'event_available', message: 'chat', note: 'sticky_note_2', system: 'info' };
+                      const colorMap = { assignment: 'text-primary', message: 'text-cta-orange', note: 'text-yellow-400', system: 'text-white/40' };
+                      return (
+                        <li key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors">
+                          <span className={`material-symbols-outlined text-xl mt-0.5 shrink-0 ${colorMap[n.type]}`}>{iconMap[n.type]}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-semibold leading-tight">{n.title}</p>
+                            <p className="text-white/50 text-xs mt-0.5 leading-relaxed">{n.body}</p>
+                          </div>
+                          <span className="text-white/30 text-[10px] shrink-0 mt-0.5">{n.time}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </>
           )}
