@@ -82,7 +82,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
           <p className="text-slate-400 dark:text-slate-400 mt-2 font-medium">{t.createAccount}</p>
         </div>
 
-        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-white bg-white text-[#0B2B53] dark:text-[#0B2B53]/5'}`}>
+        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-cta-orange bg-cta-orange/5'}`}>
           {role === 'trainer' ? t.trainer : t.student} {t.signUp}
         </div>
 

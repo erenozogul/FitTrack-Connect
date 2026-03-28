@@ -30,16 +30,16 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
 
   const trainerTabs = [
     { icon: 'folder', label: t.library, path: '/library' },
-    { icon: 'groups', label: t.board, path: '/live' },
-    { icon: 'credit_card', label: t.plans, path: '/plans' },
-    { icon: 'account_circle', label: t.profile, path: '/dashboard' }
+    { icon: 'chat_bubble', label: t.chat, path: '/messages' },
+    { icon: 'groups', label: lang === 'tr' ? 'Öğrenciler' : 'Students', path: '/students' },
+    { icon: 'account_circle', label: t.profile, path: '/profile' },
   ];
 
   const studentTabs = [
     { icon: 'home', label: t.home, path: '/dashboard' },
-    { icon: 'explore', label: t.map, path: '/explore' },
-    { icon: 'forum', label: t.chat, path: '/chat' },
-    { icon: 'person', label: t.profile, path: '/dashboard' }
+    { icon: 'folder', label: t.library, path: '/library' },
+    { icon: 'chat_bubble', label: t.chat, path: '/messages' },
+    { icon: 'bar_chart', label: t.profile, path: '/analysis' }
   ];
 
   const tabs = role === 'trainer' ? trainerTabs : studentTabs;
@@ -50,7 +50,7 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
         <h2 className="text-2xl font-black italic tracking-tighter text-white">PT<span className="text-white/80">Board</span></h2>
       </div>
       {tabs.map((tab) => (
-        <NavItem 
+        <NavItem
           key={tab.path}
           {...tab}
           isActive={location.pathname === tab.path}

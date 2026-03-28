@@ -22,104 +22,102 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectRole, lang, setLa
   };
 
   return (
-    <div className="h-screen flex flex-col snap-container bg-white dark:bg-background-dark transition-colors duration-300">
-      <section className="h-screen snap-section relative flex flex-col overflow-hidden">
-        {/* Background Accent */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] dark:opacity-[0.05] select-none pointer-events-none">
-          <span className="text-[15rem] font-black italic tracking-tighter text-slate-900 dark:text-white">PREP</span>
-        </div>
+    <div className="h-screen flex flex-col bg-background-dark overflow-hidden">
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-primary/5 rounded-full blur-[100px]" />
+      </div>
 
-        {/* Branding Overlay */}
-        <div className="fixed top-8 left-0 right-0 pointer-events-none z-50 flex flex-col items-center">
-          <div className="w-10 h-10 bg-primary/10 dark:bg-primary/20 backdrop-blur-xl rounded-lg flex items-center justify-center border border-primary/20 dark:border-primary/30 mb-2 shadow-sm">
-            <span className="material-symbols-outlined text-primary text-2xl fill-1">bolt</span>
+      {/* Header branding */}
+      <header className="relative z-10 flex items-center justify-between px-6 pt-8 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30">
+            <span className="material-symbols-outlined text-primary text-xl fill-1">bolt</span>
           </div>
-          <h1 className="text-[10px] font-bold tracking-[0.5em] text-slate-400 dark:text-white/40 uppercase">{t.brand}</h1>
+          <h1 className="text-lg font-black italic tracking-tighter text-white">PT<span className="text-white/60">Board</span></h1>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row">
-          {/* Trainer Option */}
-          <button 
+        <div className="flex items-center gap-2">
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="size-9 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 active:scale-95 transition-all text-white/60 hover:text-primary"
+            title={isDarkMode ? t.lightMode : t.darkMode}
+          >
+            <span className="material-symbols-outlined text-lg fill-1">
+              {isDarkMode ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+
+          {/* Language Selector */}
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
+            <button
+              onClick={() => setLang('tr')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${lang === 'tr' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'}`}
+            >
+              TR
+            </button>
+            <button
+              onClick={() => setLang('en')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${lang === 'en' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'}`}
+            >
+              EN
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 gap-6">
+        {/* Title */}
+        <div className="text-center mb-2">
+          <p className="text-[10px] font-bold tracking-[0.4em] text-primary/70 uppercase mb-3">{t.elevateYourTraining}</p>
+          <h2 className="text-4xl font-black text-white tracking-tight leading-none">
+            <span className="text-primary">{t.welcomeTitle2}</span>
+          </h2>
+        </div>
+
+        {/* Role cards */}
+        <div className="w-full max-w-sm flex flex-col gap-4">
+          {/* Trainer Card */}
+          <button
             onClick={() => handleSelect('trainer')}
-            className="group relative flex-1 w-full overflow-hidden transition-all duration-500 hover:flex-[1.5] border-b border-slate-100 dark:border-white/5 outline-none"
+            className="group w-full bg-card-dark border border-white/10 hover:border-primary/50 rounded-2xl p-5 flex items-center gap-4 transition-all hover:bg-primary/10 active:scale-[0.98] shadow-lg"
           >
-            <img 
-              alt="Personal Trainer" 
-              className="absolute inset-0 w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700 scale-110 group-hover:scale-100" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBemTHvlekMEEDN1JHU-mQgSp6mdFKAw6uD_NGEl1Z8OZG_4ClZ5wENfVQFTvF9RimTZ6QewKUSNfn6w6jCwUqS1jOPG9joChwTXY-fD-AUytqhXMEquKolPJxDgkovtGaeD4H4gOJp_gI_qEhdRbowX5bCfMVai3Apo6LNvnAQPgdROGns2I8RUfZK8tJLpADBgzpHtwiyq5cG_eUg1DTeZGheANS6oBIsxzbpJg7fg7NfplUWc9jDjyW-GxDRw7Qc8q7Zoj3bUdQ"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 dark:from-background-dark dark:via-background-dark/40 to-transparent"></div>
-            <div className="absolute inset-0 flex flex-col justify-center items-center p-8 text-center">
-              <span className="text-xs font-bold tracking-[0.3em] text-primary mb-2 uppercase">{t.iAmA}</span>
-              <h2 className="text-3xl font-extrabold tracking-tight mb-2 group-hover:scale-110 transition-transform uppercase text-slate-900 dark:text-white">{t.trainer}</h2>
-              <p className="text-slate-500 dark:text-white/60 text-sm max-w-[240px] opacity-0 group-hover:opacity-100 transition-opacity">{t.trainerDesc}</p>
-              <div className="mt-6 w-12 h-12 rounded-full border border-slate-200 dark:border-white/20 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-colors group-hover:shadow-lg">
-                <span className="material-symbols-outlined text-slate-400 group-hover:text-white">arrow_forward</span>
-              </div>
+            <div className="size-14 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:bg-primary/30 transition-colors">
+              <span className="material-symbols-outlined text-primary text-3xl">fitness_center</span>
             </div>
+            <div className="flex-1 text-left">
+              <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-0.5">{t.roleLabel}</p>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">{t.trainer}</h3>
+              <p className="text-xs text-white/40 mt-0.5 leading-snug">{t.trainerDesc}</p>
+            </div>
+            <span className="material-symbols-outlined text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all">arrow_forward_ios</span>
           </button>
 
-          {/* Student Option */}
-          <button 
+          {/* Student Card */}
+          <button
             onClick={() => handleSelect('student')}
-            className="group relative flex-1 w-full overflow-hidden transition-all duration-500 hover:flex-[1.5] outline-none"
+            className="group w-full bg-card-dark border border-white/10 hover:border-cta-orange/50 rounded-2xl p-5 flex items-center gap-4 transition-all hover:bg-cta-orange/5 active:scale-[0.98] shadow-lg"
           >
-            <img 
-              alt="Student" 
-              className="absolute inset-0 w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700 scale-110 group-hover:scale-100" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBaK5a6PY-OHy3rNPyHFM4kZnvGgaQFABO5gpAo2fzGBOlVBSLhod7qvnnKIvDNQgLYToygz10EAZSybGml0yzqyl7MN26D5DnhCp7EKaJObE09s3Yw7-qHhbvSHlYL8x4Jzvv46RAuPrlvyWzJ6aABxwYqzaVkVCU-mEqIahgMhyzidKezzM6rwoLM4nHnCmTgVA_v3xnHUo62UlfIuwVm50PNqEfCfGAefDbvDLlcOz_GmjA4dwz3eYs7Qjd3knqRLTB2VPbVDfQ"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-white via-white/40 dark:from-background-dark dark:via-background-dark/40 to-transparent"></div>
-            <div className="absolute inset-0 flex flex-col justify-center items-center p-8 text-center">
-              <div className="mb-6 w-12 h-12 rounded-full border border-slate-200 dark:border-white/20 flex items-center justify-center group-hover:bg-white text-[#0B2B53] dark:text-[#0B2B53] group-hover:border-cta-orange transition-colors group-hover:shadow-lg">
-                <span className="material-symbols-outlined text-slate-400 group-hover:text-white rotate-180">arrow_forward</span>
-              </div>
-              <span className="text-xs font-bold tracking-[0.3em] text-white mb-2 uppercase">{t.iAmA}</span>
-              <h2 className="text-3xl font-extrabold tracking-tight mb-2 group-hover:scale-110 transition-transform uppercase text-slate-900 dark:text-white">{t.student}</h2>
-              <p className="text-slate-500 dark:text-white/60 text-sm max-w-[240px] opacity-0 group-hover:opacity-100 transition-opacity">{t.studentDesc}</p>
+            <div className="size-14 rounded-2xl bg-cta-orange/10 border border-cta-orange/20 flex items-center justify-center shrink-0 group-hover:bg-cta-orange/20 transition-colors">
+              <span className="material-symbols-outlined text-cta-orange text-3xl">school</span>
             </div>
+            <div className="flex-1 text-left">
+              <p className="text-[10px] font-black text-cta-orange/70 uppercase tracking-widest mb-0.5">{t.roleLabel}</p>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">{t.student}</h3>
+              <p className="text-xs text-white/40 mt-0.5 leading-snug">{t.studentDesc}</p>
+            </div>
+            <span className="material-symbols-outlined text-white/20 group-hover:text-cta-orange group-hover:translate-x-1 transition-all">arrow_forward_ios</span>
           </button>
         </div>
 
-        {/* Footer Settings Area (Bottom Center/Right) */}
-        <div className="absolute bottom-8 left-0 right-0 z-50 px-6 flex justify-between items-center pointer-events-none">
-           <div className="flex-1"></div>
-           
-           <div className="flex items-center gap-3 pointer-events-auto">
-             {/* Dark Mode Toggle */}
-             <button 
-               onClick={() => setIsDarkMode(!isDarkMode)}
-               className="size-11 flex items-center justify-center bg-white dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-600 dark:text-primary"
-               title={isDarkMode ? t.lightMode : t.darkMode}
-             >
-               <span className="material-symbols-outlined text-2xl fill-1">
-                 {isDarkMode ? 'light_mode' : 'dark_mode'}
-               </span>
-             </button>
-
-             {/* Language Selector */}
-             <div className="flex items-center bg-white dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-1 shadow-xl">
-               <button 
-                 onClick={() => setLang('tr')}
-                 className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${lang === 'tr' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white'}`}
-               >
-                 TR
-               </button>
-               <button 
-                 onClick={() => setLang('en')}
-                 className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${lang === 'en' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white'}`}
-               >
-                 EN
-               </button>
-             </div>
-           </div>
-        </div>
-
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 opacity-50">
-          <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-white/40">{t.scroll}</span>
-          <span className="material-symbols-outlined animate-bounce text-slate-400 dark:text-white/40">expand_more</span>
-        </div>
-      </section>
+        {/* Footer hint */}
+        <p className="text-[10px] text-white/20 uppercase tracking-widest font-bold mt-2">
+          {t.selectRoleToContinue}
+        </p>
+      </main>
     </div>
   );
 };
