@@ -264,7 +264,11 @@ const App: React.FC = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userName, setUserName] = useState<string>('');
   const [lang, setLang] = useState<'tr' | 'en'>('tr');
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('fittrack_dark_mode');
+    // Default to dark (true) if never set
+    return saved === null ? true : saved === 'true';
+  });
 
   useEffect(() => {
     // Restore auth state from localStorage on mount
@@ -285,6 +289,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    localStorage.setItem('fittrack_dark_mode', String(isDarkMode));
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
