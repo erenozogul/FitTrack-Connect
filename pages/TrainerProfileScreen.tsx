@@ -285,6 +285,15 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
                 <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
               </button>
             ))}
+            {/* Plans link */}
+            <button
+              onClick={() => { window.location.hash = '#/plans'; }}
+              className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors w-full text-left"
+            >
+              <span className="material-symbols-outlined text-primary text-xl">workspace_premium</span>
+              <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Planlar' : 'Plans'}</span>
+              <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
+            </button>
           </div>
         </div>
 

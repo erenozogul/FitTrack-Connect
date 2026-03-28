@@ -141,9 +141,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
 
   const handleDayClick = (dayNum: number) => {
     setSelectedDay(dayNum);
-    if (isTrainer) {
-      setShowDayAssignments(true);
-    }
   };
 
   // Dynamic Content Data
@@ -278,12 +275,61 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               );
             })}
           </div>
-          {isTrainer && (
-            <p className="text-white/20 text-[9px] text-center mt-2">
-              {lang === 'tr' ? 'Seansları görmek için tıkla' : 'Tap a day to view sessions'}
-            </p>
-          )}
         </section>
+
+        {/* Trainer: Day Sessions List (inline) */}
+        {isTrainer && (
+          <section>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                {lang === 'tr' ? `${selectedDay} ${new Date().toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'long' })} – Seanslar` : `${new Date().toLocaleString('en-US', { month: 'long' })} ${selectedDay} – Sessions`}
+              </h2>
+              <button
+                onClick={() => navigate('/library')}
+                className="flex items-center gap-1 text-primary text-[10px] font-black hover:underline"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                {lang === 'tr' ? 'Ekle' : 'Add'}
+              </button>
+            </div>
+            {(() => {
+              const dayAssignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
+              if (dayAssignments.length === 0) {
+                return (
+                  <div className="flex flex-col items-center gap-3 py-8 bg-card-dark rounded-2xl border border-white/5">
+                    <span className="material-symbols-outlined text-3xl text-white/20">event_busy</span>
+                    <p className="text-white/30 text-xs font-semibold">
+                      {lang === 'tr' ? 'Bu gün için seans atanmamış' : 'No sessions assigned for this day'}
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex flex-col gap-2">
+                  {dayAssignments.map((a, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-card-dark border border-white/5 rounded-xl px-4 py-3">
+                      <img
+                        src={`https://picsum.photos/seed/${a.studentName.split(' ')[0].toLowerCase()}/100/100`}
+                        alt={a.studentName}
+                        className="size-10 rounded-full object-cover border border-white/10 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{a.studentName}</p>
+                        <p className="text-xs text-primary/80 font-semibold mt-0.5 truncate">{a.workoutName}</p>
+                      </div>
+                      {(a.startTime || a.endTime) && (
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-xs font-black text-white">{a.startTime}</p>
+                          <p className="text-[10px] text-white/40 font-semibold">{a.endTime}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </section>
+        )}
 
         {/* Hero Section */}
         <section>
