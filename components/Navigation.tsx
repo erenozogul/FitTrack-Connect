@@ -45,6 +45,7 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
   const [unreadCount] = useState(getUnreadCount);
 
   const trainerTabs = [
+    { icon: 'home', label: t.home, path: '/dashboard' },
     { icon: 'folder', label: t.library, path: '/library' },
     { icon: 'chat_bubble', label: t.chat, path: '/messages' },
     { icon: 'edit_note', label: lang === 'tr' ? 'Notlar' : 'Notes', path: '/notes' },
