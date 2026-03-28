@@ -93,8 +93,21 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number>(16);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
+  // Schedule state with localStorage overrides
+  const [schedule, setSchedule] = useState<Record<number, DaySchedule>>(() => {
+    try {
+      const saved = localStorage.getItem('fittrack_schedule');
+      return saved ? { ...weekSchedule, ...JSON.parse(saved) } : weekSchedule;
+    } catch { return weekSchedule; }
+  });
+
+  const [editingDay, setEditingDay] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', type: 'workout' as DayType, duration: 0, category: '' });
+
   const t = translations[lang];
-  const daySchedule = weekSchedule[selectedDay];
+  const daySchedule = schedule[selectedDay];
 
   const handleLogoutClick = () => {
     onLogout();
@@ -104,6 +117,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const isTrainer = role === 'trainer';
   const displayUserName = userName || (isTrainer ? "Coach Mike" : "Alex Rivera");
   const selectedStudent = mockStudents.find(s => s.id === selectedStudentId) || mockStudents[0];
+
+  const handleDayClick = (dayNum: number) => {
+    setSelectedDay(dayNum);
+    if (isTrainer) {
+      const d = schedule[dayNum];
+      setEditingDay(dayNum);
+      setEditForm({ title: d.title[lang], type: d.type, duration: d.duration, category: d.category[lang] });
+    }
+  };
 
   // Dynamic Content Data
   const profileData = isTrainer ? {
@@ -150,13 +172,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
       <header className="flex items-center justify-between p-4 md:px-8 sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md border-b border-white/5">
         <div className="flex items-center gap-3 relative">
-          <button 
+          <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className={`size-10 rounded-full flex items-center justify-center border overflow-hidden active:scale-95 transition-transform ${isTrainer ? 'border-primary shadow-lg shadow-primary/20' : 'bg-primary/20 border-primary/30'}`}
           >
             <img alt="Profile" className="w-full h-full object-cover" src={profileData.avatar} />
           </button>
-          
+
           {/* Profile Dropdown Menu */}
           {showProfileMenu && (
             <>
@@ -170,7 +192,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   <span className="material-symbols-outlined text-sm">settings</span>
                   {t.settings}
                 </button>
-                <button 
+                <button
                   onClick={handleLogoutClick}
                   className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors border-t border-white/5"
                 >
@@ -203,21 +225,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             {days.map((day) => {
               const isActive = day.num === selectedDay;
               return (
-              <div 
-                key={day.num}
-                onClick={() => setSelectedDay(day.num)}
-                className={`flex flex-col items-center min-w-[48px] py-3 rounded-xl border transition-all cursor-pointer ${
-                  isActive 
-                  ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-105'
-                  : 'bg-card-dark border-white/5 text-white hover:bg-white/10'
-                }`}
-              >
-                <span className={`text-[8px] uppercase font-bold ${isActive ? 'text-white/80' : 'text-white/40'}`}>{day.label}</span>
-                <span className="text-sm font-black">{day.num}</span>
-                <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[weekSchedule[day.num].type]}`}></span>
-              </div>
-            )})}
+                <div
+                  key={day.num}
+                  onClick={() => handleDayClick(day.num)}
+                  className={`flex flex-col items-center min-w-[48px] py-3 rounded-xl border transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-105'
+                      : 'bg-card-dark border-white/5 text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className={`text-[8px] uppercase font-bold ${isActive ? 'text-white/80' : 'text-white/40'}`}>{day.label}</span>
+                  <span className="text-sm font-black">{day.num}</span>
+                  <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[schedule[day.num].type]}`}></span>
+                </div>
+              );
+            })}
           </div>
+          {isTrainer && (
+            <p className="text-white/20 text-[9px] text-center mt-2">
+              {lang === 'tr' ? 'Düzenlemek için tıkla' : 'Tap a day to edit'}
+            </p>
+          )}
         </section>
 
         {/* Hero Section */}
@@ -277,7 +305,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   {isTrainer ? selectedStudent.name : daySchedule.title[lang]}
                 </h3>
                 <button
-                  onClick={() => navigate(isTrainer ? '/plans' : '/live')}
+                  onClick={() => isTrainer ? navigate('/plans') : setShowWorkoutModal(true)}
                   className="w-full bg-white hover:scale-[1.02] text-[#0B2B53] font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
                 >
                   <span className="material-symbols-outlined text-xl">{isTrainer ? 'event_note' : 'play_circle'}</span>
@@ -306,6 +334,106 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
       </main>
 
       <BottomNav role={role} lang={lang} />
+
+      {/* Workout Start Modal (student only) */}
+      {showWorkoutModal && daySchedule.type !== 'off' && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowWorkoutModal(false)}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest">{daySchedule.category[lang]}</p>
+                <h2 className="text-xl font-black text-white mt-1">{daySchedule.title[lang]}</h2>
+              </div>
+              <button onClick={() => setShowWorkoutModal(false)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            {/* Workout info */}
+            <div className="flex gap-3 mb-6">
+              <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
+                <p className="text-white/40 text-[9px] font-black uppercase">{lang === 'tr' ? 'Süre' : 'Duration'}</p>
+                <p className="text-white font-black">{daySchedule.duration} dk</p>
+              </div>
+              <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
+                <p className="text-white/40 text-[9px] font-black uppercase">{lang === 'tr' ? 'Seviye' : 'Level'}</p>
+                <p className="text-white font-black">{daySchedule.level[lang]}</p>
+              </div>
+              <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
+                <p className="text-white/40 text-[9px] font-black uppercase">{lang === 'tr' ? 'Tip' : 'Type'}</p>
+                <p className="text-white font-black">{daySchedule.type === 'cardio' ? 'Kardiyo' : 'İdman'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowWorkoutModal(false)}
+              className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined">play_circle</span>
+              {lang === 'tr' ? 'Antrenmanı Başlat' : 'Start Workout'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Trainer Edit Day Modal */}
+      {isTrainer && editingDay !== null && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setEditingDay(null)}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-black text-white">{lang === 'tr' ? `${editingDay} Mart - Düzenle` : `March ${editingDay} - Edit`}</h2>
+              <button onClick={() => setEditingDay(null)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50"><span className="material-symbols-outlined text-lg">close</span></button>
+            </div>
+            {/* Type selector */}
+            <div>
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">{lang === 'tr' ? 'Tür' : 'Type'}</p>
+              <div className="flex gap-2">
+                {(['workout', 'cardio', 'off'] as DayType[]).map(type => (
+                  <button key={type} onClick={() => setEditForm(f => ({...f, type}))}
+                    className={`flex-1 py-2 rounded-xl text-xs font-black uppercase transition-colors ${editForm.type === type ? 'bg-primary text-white' : 'bg-white/5 text-white/50'}`}>
+                    {type === 'workout' ? (lang === 'tr' ? 'İdman' : 'Workout') : type === 'cardio' ? 'Kardiyo' : (lang === 'tr' ? 'Off' : 'Rest')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Title and Duration inputs */}
+            {editForm.type !== 'off' && (
+              <>
+                <div>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Başlık' : 'Title'}</p>
+                  <input value={editForm.title} onChange={e => setEditForm(f => ({...f, title: e.target.value}))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Süre (dk)' : 'Duration (min)'}</p>
+                  <input type="number" value={editForm.duration} onChange={e => setEditForm(f => ({...f, duration: parseInt(e.target.value) || 0}))}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60" />
+                </div>
+              </>
+            )}
+            <button onClick={() => {
+              const updated = { ...schedule };
+              updated[editingDay] = {
+                ...schedule[editingDay],
+                type: editForm.type,
+                title: { tr: editForm.title, en: editForm.title },
+                category: editForm.type === 'off' ? { tr: 'Off', en: 'Off' } : { tr: editForm.category || editForm.title, en: editForm.category || editForm.title },
+                duration: editForm.type === 'off' ? 0 : editForm.duration,
+                level: schedule[editingDay].level,
+                image: schedule[editingDay].image,
+              };
+              setSchedule(updated);
+              // save only the overrides to localStorage
+              const overrides: Record<number, DaySchedule> = {};
+              Object.keys(updated).forEach(k => { overrides[parseInt(k)] = updated[parseInt(k)]; });
+              localStorage.setItem('fittrack_schedule', JSON.stringify(overrides));
+              setEditingDay(null);
+            }}
+              className="w-full bg-primary text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all">
+              <span className="material-symbols-outlined text-lg">check</span>
+              {lang === 'tr' ? 'Kaydet' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

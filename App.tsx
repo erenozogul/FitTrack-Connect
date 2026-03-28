@@ -15,6 +15,7 @@ import CheckoutScreen from './pages/CheckoutScreen';
 import MessagesScreen from './pages/MessagesScreen';
 import StudentsScreen from './pages/StudentsScreen';
 import TrainerProfileScreen from './pages/TrainerProfileScreen';
+import AnalysisNotesScreen from './pages/AnalysisNotesScreen';
 import { UserRole } from './types';
 
 // Add missing error translation keys to translations object
@@ -334,6 +335,7 @@ const App: React.FC = () => {
           <Route path="/explore" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><MapExplorer lang={lang} /></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><CheckoutScreen lang={lang} /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><MessagesScreen lang={lang} role={role as 'trainer' | 'student'} userName={userName} /></ProtectedRoute>} />
+          <Route path="/notes" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><AnalysisNotesScreen lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><StudentsScreen lang={lang} onLogout={handleLogout} /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerProfileScreen lang={lang} setLang={setLang} onLogout={handleLogout} userName={userName} role={role as 'trainer' | 'student'} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />

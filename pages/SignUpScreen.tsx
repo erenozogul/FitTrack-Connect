@@ -13,6 +13,7 @@ interface SignUpScreenProps {
 const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => {
   const navigate = useNavigate();
   const t = translations[lang];
+  const [gender, setGender] = useState<'male' | 'female'>('male');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
@@ -30,7 +31,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, firstName, lastName, username, email, password }),
+        body: JSON.stringify({ role, firstName, lastName, username, email, password, gender }),
       });
 
       const data = await response.json();
@@ -43,7 +44,8 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
       }
 
       localStorage.setItem('fittrack_token', data.token);
-      localStorage.setItem('fittrack_user', JSON.stringify(data.user));
+      localStorage.setItem('fittrack_user', JSON.stringify({ ...data.user, gender }));
+      localStorage.setItem('fittrack_gender', gender);
 
       onSignUp(`${firstName} ${lastName}`);
       navigate(role === 'trainer' ? '/library' : '/dashboard');
@@ -73,8 +75,33 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
           <p className="text-slate-500 dark:text-white/40 mt-2 font-medium">{t.createAccount}</p>
         </div>
 
-        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-cta-orange bg-cta-orange/5'}`}>
+        <div className={`mb-6 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-cta-orange bg-cta-orange/5'}`}>
           {role === 'trainer' ? t.trainer : t.student} {t.signUp}
+        </div>
+
+        {/* Gender selector */}
+        <div className="w-full mb-6">
+          <p className="text-xs font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2">
+            {lang === 'tr' ? 'Cinsiyet' : 'Gender'}
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setGender('male')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95 ${gender === 'male' ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-white/60'}`}
+            >
+              <span className="material-symbols-outlined text-xl">man</span>
+              {lang === 'tr' ? 'Erkek' : 'Male'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setGender('female')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95 ${gender === 'female' ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-white/60'}`}
+            >
+              <span className="material-symbols-outlined text-xl">woman</span>
+              {lang === 'tr' ? 'Kadın' : 'Female'}
+            </button>
+          </div>
         </div>
 
         {error && (

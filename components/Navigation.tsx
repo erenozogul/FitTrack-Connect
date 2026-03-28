@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { translations } from '../App';
 
@@ -9,28 +9,45 @@ interface NavItemProps {
   path: string;
   isActive: boolean;
   onClick: (path: string) => void;
+  badge?: number;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, path, isActive, onClick }) => (
-  <button 
+const NavItem: React.FC<NavItemProps> = ({ icon, label, path, isActive, onClick, badge }) => (
+  <button
     onClick={() => onClick(path)}
     className={`flex flex-col md:flex-row items-center md:justify-start gap-1 md:gap-4 p-2 md:p-3 md:w-full rounded-xl transition-all active:scale-95 ${isActive ? 'bg-white text-primary shadow-lg shadow-black/10' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
   >
-    <span className={`material-symbols-outlined text-2xl ${isActive ? 'fill-1' : ''}`}>
-      {icon}
-    </span>
+    <div className="relative">
+      <span className={`material-symbols-outlined text-2xl ${isActive ? 'fill-1' : ''}`}>
+        {icon}
+      </span>
+      {badge !== undefined && badge > 0 && !isActive && (
+        <span className="absolute -top-1 -right-1 size-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-black">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+    </div>
     <span className="text-[10px] md:text-sm font-bold uppercase md:normal-case md:font-semibold md:tracking-normal tracking-widest">{label}</span>
   </button>
 );
+
+const getUnreadCount = () => {
+  try {
+    const notes = JSON.parse(localStorage.getItem('fittrack_notes') || '[]');
+    return notes.filter((n: any) => !n.isRead).length;
+  } catch { return 0; }
+};
 
 export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en' }> = ({ role, lang }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const t = translations[lang];
+  const [unreadCount] = useState(getUnreadCount);
 
   const trainerTabs = [
     { icon: 'folder', label: t.library, path: '/library' },
     { icon: 'chat_bubble', label: t.chat, path: '/messages' },
+    { icon: 'edit_note', label: lang === 'tr' ? 'Notlar' : 'Notes', path: '/notes' },
     { icon: 'groups', label: lang === 'tr' ? 'Öğrenciler' : 'Students', path: '/students' },
     { icon: 'account_circle', label: t.profile, path: '/profile' },
   ];
@@ -38,8 +55,9 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
   const studentTabs = [
     { icon: 'home', label: t.home, path: '/dashboard' },
     { icon: 'folder', label: t.library, path: '/library' },
+    { icon: 'edit_note', label: lang === 'tr' ? 'Notlar' : 'Notes', path: '/notes' },
     { icon: 'chat_bubble', label: t.chat, path: '/messages' },
-    { icon: 'bar_chart', label: t.profile, path: '/analysis' }
+    { icon: 'account_circle', label: t.profile, path: '/profile' },
   ];
 
   const tabs = role === 'trainer' ? trainerTabs : studentTabs;
@@ -55,6 +73,7 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
           {...tab}
           isActive={location.pathname === tab.path}
           onClick={navigate}
+          badge={tab.path === '/notes' && role === 'student' ? unreadCount : undefined}
         />
       ))}
     </nav>
