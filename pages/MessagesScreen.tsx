@@ -247,7 +247,7 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
                 <div className="fixed inset-0 z-10" onClick={() => setShowChatMenu(false)}></div>
                 <div className="absolute top-11 right-0 w-52 bg-card-dark border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden">
                   <button
-                    onClick={() => { setShowChatMenu(false); navigate('/profile'); }}
+                    onClick={() => { setShowChatMenu(false); navigate(`/students?id=${contact.id}`); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors"
                   >
                     <span className="material-symbols-outlined text-base text-white/40">person</span>

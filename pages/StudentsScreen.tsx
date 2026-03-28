@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
@@ -21,9 +21,19 @@ type Student = typeof mockStudents[0];
 
 const StudentsScreen: React.FC<StudentsScreenProps> = ({ lang, onLogout }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const t = translations[lang];
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Auto-open student profile if ?id= param is present (e.g. from Messages)
+  useEffect(() => {
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      const found = mockStudents.find(s => s.id === Number(idParam));
+      if (found) setSelectedStudent(found);
+    }
+  }, [searchParams]);
 
   const filteredStudents = mockStudents.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
