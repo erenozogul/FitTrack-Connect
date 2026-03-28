@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
+import { addNotification } from '../utils/notifications';
 
 interface MessagesScreenProps {
   lang: 'tr' | 'en';
@@ -127,6 +128,13 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
     setInputText('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     triggerAutoReply();
+    if (selectedContact) {
+      addNotification({
+        type: 'message',
+        title: lang === 'tr' ? `${selectedContact.name}'dan mesaj` : `Message from ${selectedContact.name}`,
+        body: trimmed.slice(0, 80),
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

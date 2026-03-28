@@ -71,6 +71,18 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
 
+  const trainerCode = (parsedUser.username || 'TRAINER').toUpperCase().replace(/[^A-Z0-9]/g, '') + '2026';
+  const connectedStudentsCount = (() => {
+    try {
+      const assignments = JSON.parse(localStorage.getItem('fittrack_assignments') || '{}');
+      const allStudentIds = new Set<number>();
+      Object.values(assignments).forEach((day: any) => {
+        (day as any[]).forEach((a: any) => allStudentIds.add(a.studentId));
+      });
+      return allStudentIds.size;
+    } catch { return 0; }
+  })();
+
   const storedName = userName || (parsedUser.firstName && parsedUser.lastName ? `${parsedUser.firstName} ${parsedUser.lastName}` : '');
   const displayName = storedName || (isTrainer ? (lang === 'tr' ? 'Antrenör' : 'Trainer') : (lang === 'tr' ? 'Öğrenci' : 'Student'));
   const storedEmail = parsedUser.email || '';
@@ -269,6 +281,54 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
           <p className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest mb-2 px-1">
             {lang === 'tr' ? 'Hesap' : 'Account'}
           </p>
+          {isTrainer && (
+            <div className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 rounded-2xl p-4 mb-4">
+              <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-1">
+                {lang === 'tr' ? 'Davet Kodunuz' : 'Your Invite Code'}
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-2xl font-black text-white tracking-widest">{trainerCode}</span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(trainerCode).catch(() => {})}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-xl text-primary text-xs font-bold transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">content_copy</span>
+                  {lang === 'tr' ? 'Kopyala' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-white/30 text-xs mt-2">
+                {lang === 'tr'
+                  ? `Bu kodu öğrencilerinizle paylaşın • ${connectedStudentsCount} öğrenci bağlı`
+                  : `Share this code with your students • ${connectedStudentsCount} student${connectedStudentsCount !== 1 ? 's' : ''} connected`}
+              </p>
+            </div>
+          )}
+          {!isTrainer && (() => {
+            try {
+              const ct = JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null');
+              if (!ct) return null;
+              return (
+                <div className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 rounded-2xl p-4 mb-4">
+                  <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-2">
+                    {lang === 'tr' ? 'Antrenörüm' : 'My Trainer'}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <img src={ct.avatar} alt={ct.name} className="size-10 rounded-full object-cover border-2 border-primary/30" />
+                    <div>
+                      <p className="text-white font-bold text-sm">{ct.name}</p>
+                      <p className="text-white/40 text-xs">{ct.specialty}</p>
+                    </div>
+                    <button
+                      onClick={() => { localStorage.removeItem('fittrack_connected_trainer'); window.location.reload(); }}
+                      className="ml-auto text-white/30 hover:text-red-400 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-lg">link_off</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            } catch { return null; }
+          })()}
           <div className="flex flex-col gap-2">
             {[
               { icon: 'person', label: lang === 'tr' ? 'Kişisel Bilgiler' : 'Personal Info', modal: 'personalInfo' as ModalType },
