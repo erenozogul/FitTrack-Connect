@@ -162,6 +162,53 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { role, email } = req.body;
+    if (!role || !email) {
+      return res.status(400).json({ error: "error_missing_fields" });
+    }
+    const sql = getDb();
+    const users = await sql`
+      SELECT id FROM users WHERE role = ${role} AND email = ${email}
+    `;
+    if (users.length === 0) {
+      return res.status(404).json({ error: "error_email_not_found" });
+    }
+    res.json({ message: "ok" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { role, email, newPassword } = req.body;
+    if (!role || !email || !newPassword) {
+      return res.status(400).json({ error: "error_missing_fields" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "error_password_too_short" });
+    }
+    const sql = getDb();
+    const users = await sql`
+      SELECT id FROM users WHERE role = ${role} AND email = ${email}
+    `;
+    if (users.length === 0) {
+      return res.status(404).json({ error: "error_email_not_found" });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await sql`
+      UPDATE users SET password_hash = ${passwordHash} WHERE role = ${role} AND email = ${email}
+    `;
+    res.json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
 app.get("/api/templates", authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user.userId;
