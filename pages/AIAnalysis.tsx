@@ -5,9 +5,10 @@ import { BottomNav } from '../components/Navigation';
 
 interface AIAnalysisProps {
   lang: 'tr' | 'en';
+  role?: 'trainer' | 'student';
 }
 
-const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
+const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang, role = 'student' }) => {
   const navigate = useNavigate();
 
   return (
@@ -19,7 +20,7 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
           </button>
           <div>
             <h1 className="text-[8px] font-black tracking-[0.3em] text-white/30 uppercase leading-none mb-1">PTBoard</h1>
-            <p className="text-sm font-black uppercase italic">AI Form Analysis</p>
+            <p className="text-sm font-black uppercase italic">{lang === 'tr' ? 'AI Form Analizi' : 'AI Form Analysis'}</p>
           </div>
         </div>
         <button className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -42,7 +43,7 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
             <h2 className="text-lg font-black text-white">Sarah Jenkins</h2>
             <div className="flex items-center gap-2 text-[10px] font-bold text-primary/80 uppercase">
               <span className="material-symbols-outlined text-xs">calendar_today</span>
-              <span>Session: Oct 24, 2023</span>
+              <span>{lang === 'tr' ? 'Seans: 24 Eki 2023' : 'Session: Oct 24, 2023'}</span>
             </div>
           </div>
         </section>
@@ -73,27 +74,27 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
               </span>
-              AI Live Analysis Active
+              {lang === 'tr' ? 'AI Canlı Analiz Aktif' : 'AI Live Analysis Active'}
             </div>
           </div>
         </section>
 
         {/* Diagnostics */}
         <section className="px-4 space-y-4 mt-2">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-primary/60">Diagnostic Findings</h3>
-          
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-primary/60">{lang === 'tr' ? 'Tanı Bulguları' : 'Diagnostic Findings'}</h3>
+
           <div className="bg-card-dark border border-primary/20 rounded-2xl p-4 shadow-xl">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">warning</span>
-                <h4 className="font-bold text-white text-sm">Anterior Pelvic Tilt</h4>
+                <h4 className="font-bold text-white text-sm">{lang === 'tr' ? 'Anterior Pelvik Eğim' : 'Anterior Pelvic Tilt'}</h4>
               </div>
-              <span className="px-2 py-0.5 bg-red-500/20 text-red-500 text-[8px] font-black uppercase rounded border border-red-500/30">Severe</span>
+              <span className="px-2 py-0.5 bg-red-500/20 text-red-500 text-[8px] font-black uppercase rounded border border-red-500/30">{lang === 'tr' ? 'Şiddetli' : 'Severe'}</span>
             </div>
-            <p className="text-[11px] text-white/40 mb-4 leading-relaxed">Significant forward rotation of the pelvis detected during neutral stance. Correction advised.</p>
+            <p className="text-[11px] text-white/40 mb-4 leading-relaxed">{lang === 'tr' ? 'Nötr duruşta pelvisin belirgin öne rotasyonu tespit edildi. Düzeltme önerilir.' : 'Significant forward rotation of the pelvis detected during neutral stance. Correction advised.'}</p>
             <div className="flex items-center gap-2">
-              <div className="px-3 py-1 bg-background-dark rounded border border-primary/30 text-primary text-[10px] font-black">Metric: 15.2°</div>
-              <div className="px-3 py-1 bg-background-dark rounded border border-white/5 text-white/20 text-[10px] font-black">Target: &lt; 5°</div>
+              <div className="px-3 py-1 bg-background-dark rounded border border-primary/30 text-primary text-[10px] font-black">{lang === 'tr' ? 'Metrik: 15.2°' : 'Metric: 15.2°'}</div>
+              <div className="px-3 py-1 bg-background-dark rounded border border-white/5 text-white/20 text-[10px] font-black">{lang === 'tr' ? 'Hedef: < 5°' : 'Target: < 5°'}</div>
             </div>
           </div>
 
@@ -101,14 +102,14 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">straighten</span>
-                <h4 className="font-bold text-white text-sm">Right Shoulder Depression</h4>
+                <h4 className="font-bold text-white text-sm">{lang === 'tr' ? 'Sağ Omuz Çöküşü' : 'Right Shoulder Depression'}</h4>
               </div>
-              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 text-[8px] font-black uppercase rounded border border-yellow-500/30">Moderate</span>
+              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 text-[8px] font-black uppercase rounded border border-yellow-500/30">{lang === 'tr' ? 'Orta' : 'Moderate'}</span>
             </div>
-            <p className="text-[11px] text-white/40 mb-4 leading-relaxed">Right acromion dropped relative to horizontal axis. Balanced loading recommended.</p>
+            <p className="text-[11px] text-white/40 mb-4 leading-relaxed">{lang === 'tr' ? 'Sağ akromiyon yatay eksene göre düşmüş. Dengeli yükleme önerilir.' : 'Right acromion dropped relative to horizontal axis. Balanced loading recommended.'}</p>
             <div className="flex items-center gap-2">
-              <div className="px-3 py-1 bg-background-dark rounded border border-primary/30 text-primary text-[10px] font-black">Metric: 8.4°</div>
-              <div className="px-3 py-1 bg-background-dark rounded border border-white/5 text-white/20 text-[10px] font-black">Target: &lt; 3°</div>
+              <div className="px-3 py-1 bg-background-dark rounded border border-primary/30 text-primary text-[10px] font-black">{lang === 'tr' ? 'Metrik: 8.4°' : 'Metric: 8.4°'}</div>
+              <div className="px-3 py-1 bg-background-dark rounded border border-white/5 text-white/20 text-[10px] font-black">{lang === 'tr' ? 'Hedef: < 3°' : 'Target: < 3°'}</div>
             </div>
           </div>
         </section>
@@ -118,8 +119,8 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
         <div className="max-w-3xl mx-auto w-full">
           <div className="px-2 py-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-black text-primary/70 uppercase">Monthly Quota</span>
-              <span className="text-[9px] font-black text-white uppercase">1 / 1 Analysis Credits Used</span>
+              <span className="text-[9px] font-black text-primary/70 uppercase">{lang === 'tr' ? 'Aylık Kota' : 'Monthly Quota'}</span>
+              <span className="text-[9px] font-black text-white uppercase">{lang === 'tr' ? '1 / 1 Analiz Kredisi Kullanıldı' : '1 / 1 Analysis Credits Used'}</span>
             </div>
             <div className="w-full h-1.5 bg-primary/10 rounded-full overflow-hidden">
               <div className="h-full bg-primary w-full shadow-[0_0_10px_rgba(0,122,255,0.5)] transition-all duration-1000"></div>
@@ -127,13 +128,13 @@ const AIAnalysis: React.FC<AIAnalysisProps> = ({ lang }) => {
           </div>
           <button className="w-full bg-white text-[#0B2B53] font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-cta-orange/20 uppercase text-xs">
             <span className="material-symbols-outlined font-black">picture_as_pdf</span>
-            Generate PDF Report
+            {lang === 'tr' ? 'PDF Raporu Oluştur' : 'Generate PDF Report'}
           </button>
         </div>
       </footer>
 
       {/* Fixed: Pass lang to BottomNav */}
-      <BottomNav role="trainer" lang={lang} />
+      <BottomNav role={role} lang={lang} />
     </div>
   );
 };

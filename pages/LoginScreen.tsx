@@ -73,10 +73,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
             <span className="material-symbols-outlined text-primary text-4xl fill-1">bolt</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{t.brand}</h1>
-          <p className="text-slate-400 dark:text-slate-400 mt-2 font-medium">Elevate Your Training</p>
+          <p className="text-slate-400 dark:text-slate-400 mt-2 font-medium">{t.elevateYourTraining}</p>
         </div>
 
-        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-white bg-white text-[#0B2B53] dark:text-[#0B2B53]/5'}`}>
+        <div className={`mb-8 px-6 py-2 rounded-full border text-xs font-bold uppercase tracking-widest ${role === 'trainer' ? 'border-primary/30 text-primary bg-primary/5' : 'border-cta-orange/30 text-cta-orange bg-cta-orange/5'}`}>
           {role === 'trainer' ? t.trainer : t.student} {t.login}
         </div>
 

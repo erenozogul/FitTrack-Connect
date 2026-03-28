@@ -5,9 +5,10 @@ import { BottomNav } from '../components/Navigation';
 
 interface LiveSessionProps {
   lang: 'tr' | 'en';
+  role?: 'trainer' | 'student';
 }
 
-const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
+const LiveSession: React.FC<LiveSessionProps> = ({ lang, role = 'trainer' }) => {
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(true);
 
@@ -151,7 +152,7 @@ const LiveSession: React.FC<LiveSessionProps> = ({ lang }) => {
       </footer>
 
       {/* Fixed: Pass lang to BottomNav */}
-      <BottomNav role="trainer" lang={lang} />
+      <BottomNav role={role} lang={lang} />
     </div>
   );
 };

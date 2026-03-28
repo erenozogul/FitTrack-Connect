@@ -5,9 +5,10 @@ import { BottomNav } from '../components/Navigation';
 
 interface PlansScreenProps {
   lang: 'tr' | 'en';
+  role?: 'trainer' | 'student';
 }
 
-const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
+const PlansScreen: React.FC<PlansScreenProps> = ({ lang, role = 'trainer' }) => {
   const navigate = useNavigate();
 
   const plans = [
@@ -24,7 +25,7 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
       price: '249 TL',
       capacity: '15 Students',
       progress: '50%',
-      features: ['Enhanced Management Suite', 'Custom Workout Builder', 'Priority Email Support', 'Best Capacity Value'],
+      features: ['Enhanced Management Suite', 'Custom Workout Builder', lang === 'tr' ? 'Egzersiz Animasyonları' : 'Exercise Animations', 'Priority Email Support'],
       cta: lang === 'tr' ? 'Silver Seç' : 'Choose Silver',
       bestValue: true
     },
@@ -116,7 +117,7 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ lang }) => {
         </div>
       </main>
 
-      <BottomNav role="trainer" lang={lang} />
+      <BottomNav role={role} lang={lang} />
     </div>
   );
 };
