@@ -918,6 +918,8 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     const d = new Date();
     return d.toISOString().split('T')[0];
   });
+  const [assignStartTime, setAssignStartTime] = useState<string>('09:00');
+  const [assignEndTime, setAssignEndTime] = useState<string>('10:00');
   const [assignStudentDropdown, setAssignStudentDropdown] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
 
@@ -935,7 +937,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     try {
       const existing = JSON.parse(localStorage.getItem('fittrack_assignments') || '{}');
       const key = assignDate;
-      const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang] };
+      const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang], startTime: assignStartTime, endTime: assignEndTime };
       existing[key] = [...(existing[key] || []), newEntry];
       localStorage.setItem('fittrack_assignments', JSON.stringify(existing));
     } catch { /* ignore */ }
@@ -1222,6 +1224,32 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                     onChange={e => setAssignDate(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
                   />
+                </div>
+
+                {/* Time range */}
+                <div>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Saat Aralığı' : 'Time Range'}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-[9px] text-white/30 font-bold uppercase mb-1">{lang === 'tr' ? 'Başlangıç' : 'Start'}</p>
+                      <input
+                        type="time"
+                        value={assignStartTime}
+                        onChange={e => setAssignStartTime(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
+                      />
+                    </div>
+                    <span className="text-white/30 font-black mt-5">→</span>
+                    <div className="flex-1">
+                      <p className="text-[9px] text-white/30 font-bold uppercase mb-1">{lang === 'tr' ? 'Bitiş' : 'End'}</p>
+                      <input
+                        type="time"
+                        value={assignEndTime}
+                        onChange={e => setAssignEndTime(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <button

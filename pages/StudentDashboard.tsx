@@ -107,7 +107,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [editForm, setEditForm] = useState({ title: '', type: 'workout' as DayType, duration: 0, category: '' });
   const [showDayAssignments, setShowDayAssignments] = useState(false);
 
-  const loadAssignments = (): Record<string, Array<{ studentId: number; studentName: string; workoutId: string; workoutName: string }>> => {
+  const loadAssignments = (): Record<string, Array<{ studentId: number; studentName: string; workoutId: string; workoutName: string; startTime?: string; endTime?: string }>> => {
     try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
   };
 
@@ -469,6 +469,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       <div className="flex-1">
                         <p className="text-sm font-bold text-white">{a.studentName}</p>
                         <p className="text-xs text-primary font-semibold mt-0.5">{a.workoutName}</p>
+                        {(a.startTime || a.endTime) && (
+                          <p className="text-[10px] text-white/40 font-semibold mt-0.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[10px]">schedule</span>
+                            {a.startTime}{a.endTime ? ` – ${a.endTime}` : ''}
+                          </p>
+                        )}
                       </div>
                       <span className="material-symbols-outlined text-white/20 text-lg">fitness_center</span>
                     </div>
