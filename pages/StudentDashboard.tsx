@@ -337,7 +337,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       );
                     })()
                   ) : (
-                    <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[schedule[day.num].type]}`}></span>
+                    <span className={`size-1.5 rounded-full mt-0.5 ${isActive ? 'bg-white/60' : dayDotColor[(schedule[day.num] ?? defaultDaySchedule).type]}`}></span>
                   )}
                 </div>
               );
