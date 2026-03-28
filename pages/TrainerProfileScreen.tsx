@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
@@ -13,7 +13,7 @@ interface TrainerProfileScreenProps {
   setIsDarkMode: (v: boolean) => void;
 }
 
-type ModalType = 'personalInfo' | 'password' | 'notifications' | 'help' | null;
+type ModalType = 'personalInfo' | 'password' | 'notifications' | 'help' | 'settings' | null;
 
 const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   lang, setLang, onLogout, userName, role = 'trainer', isDarkMode, setIsDarkMode
@@ -25,6 +25,27 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [notifWorkout, setNotifWorkout] = useState(true);
   const [notifMessages, setNotifMessages] = useState(true);
   const [notifProgress, setNotifProgress] = useState(false);
+
+  // Avatar state – read from localStorage
+  const [avatarSrc, setAvatarSrc] = useState<string>(
+    localStorage.getItem('fittrack_avatar') || 'https://picsum.photos/seed/trainer/200/200'
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setAvatarSrc(base64);
+      localStorage.setItem('fittrack_avatar', base64);
+    };
+    reader.readAsDataURL(file);
+    // reset input so same file can be selected again
+    e.target.value = '';
+  };
 
   // Read user info from localStorage
   const userStr = localStorage.getItem('fittrack_user');
@@ -115,18 +136,19 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
+    <div className="min-h-screen bg-slate-50 dark:bg-background-dark pb-32 md:pb-0 md:pl-64 transition-colors duration-300">
       {/* Sticky header */}
-      <div className="sticky top-0 z-40 bg-background-dark/90 backdrop-blur-xl border-b border-white/5 px-4 pt-12 pb-4">
+      <div className="sticky top-0 z-40 bg-slate-50/90 dark:bg-background-dark/90 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 px-4 pt-12 pb-4 transition-colors">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <h1 className="text-xl font-black text-white">
+          <h1 className="text-xl font-black text-slate-900 dark:text-white">
             {lang === 'tr' ? 'Profil' : 'Profile'}
           </h1>
+          {/* Settings gear → opens settings modal */}
           <button
-            onClick={() => setActiveModal('personalInfo')}
-            className="bg-white/5 rounded-xl p-2.5 hover:bg-white/10 transition-colors active:scale-95"
+            onClick={() => setActiveModal('settings')}
+            className="bg-slate-200 dark:bg-white/5 rounded-xl p-2.5 hover:bg-slate-300 dark:hover:bg-white/10 transition-colors active:scale-95"
           >
-            <span className="material-symbols-outlined text-white text-2xl">settings</span>
+            <span className="material-symbols-outlined text-slate-700 dark:text-white text-2xl">settings</span>
           </button>
         </div>
       </div>
@@ -134,45 +156,53 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
       <div className="px-4 py-6 max-w-2xl mx-auto flex flex-col gap-6">
         {/* Profile section */}
         <div className="flex flex-col items-center gap-3">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
           <div className="relative">
             <img
-              src="https://picsum.photos/seed/trainer/200/200"
+              src={avatarSrc}
               alt={displayName}
               className="size-24 rounded-3xl border-2 border-primary/40 object-cover"
             />
             <button
-              onClick={() => alert(t.comingSoon)}
+              onClick={handleAvatarClick}
               className="absolute bottom-0 right-0 bg-primary text-white rounded-full size-8 flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors active:scale-95"
             >
               <span className="material-symbols-outlined text-sm">photo_camera</span>
             </button>
           </div>
-          <h2 className="text-2xl font-black text-white">{displayName}</h2>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">{displayName}</h2>
           <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
             {isTrainer ? (lang === 'tr' ? 'KİŞİSEL ANTRENÖR' : 'PERSONAL TRAINER') : (lang === 'tr' ? 'ÖĞRENCİ' : 'STUDENT')}
           </span>
-          {storedEmail && <p className="text-sm text-white/40">{storedEmail}</p>}
+          {storedEmail && <p className="text-sm text-slate-500 dark:text-white/40">{storedEmail}</p>}
         </div>
 
         {/* Stats row */}
         <div className={`grid gap-3 ${isTrainer ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {isTrainer && (
-            <div className="bg-card-dark border border-white/5 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-black text-white">5</p>
-              <p className="text-[10px] text-white/40 uppercase mt-1">
+            <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center transition-colors">
+              <p className="text-2xl font-black text-slate-900 dark:text-white">5</p>
+              <p className="text-[10px] text-slate-500 dark:text-white/40 uppercase mt-1">
                 {lang === 'tr' ? 'Aktif Öğrenci' : 'Active Students'}
               </p>
             </div>
           )}
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-black text-white">{isTrainer ? '124' : '38'}</p>
-            <p className="text-[10px] text-white/40 uppercase mt-1">
+          <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center transition-colors">
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{isTrainer ? '124' : '38'}</p>
+            <p className="text-[10px] text-slate-500 dark:text-white/40 uppercase mt-1">
               {lang === 'tr' ? 'Toplam Seans' : 'Total Sessions'}
             </p>
           </div>
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-black text-white">{isTrainer ? '4.9 ⭐' : '82.4 kg'}</p>
-            <p className="text-[10px] text-white/40 uppercase mt-1">
+          <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center transition-colors">
+            <p className="text-2xl font-black text-slate-900 dark:text-white">{isTrainer ? '4.9 ⭐' : '82.4 kg'}</p>
+            <p className="text-[10px] text-slate-500 dark:text-white/40 uppercase mt-1">
               {isTrainer ? (lang === 'tr' ? 'Değerlendirme' : 'Rating') : (lang === 'tr' ? 'Güncel Kilo' : 'Current Weight')}
             </p>
           </div>
@@ -180,80 +210,73 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
 
         {/* Account settings */}
         <div>
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 px-1">
+          <p className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest mb-2 px-1">
             {lang === 'tr' ? 'Hesap' : 'Account'}
           </p>
           <div className="flex flex-col gap-2">
-            <button
-              onClick={() => setActiveModal('personalInfo')}
-              className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors w-full text-left"
-            >
-              <span className="material-symbols-outlined text-primary text-xl">person</span>
-              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Kişisel Bilgiler' : 'Personal Info'}</span>
-              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
-            </button>
-            <button
-              onClick={() => setActiveModal('password')}
-              className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors w-full text-left"
-            >
-              <span className="material-symbols-outlined text-primary text-xl">lock</span>
-              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Şifre Değiştir' : 'Change Password'}</span>
-              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
-            </button>
-            <button
-              onClick={() => setActiveModal('notifications')}
-              className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors w-full text-left"
-            >
-              <span className="material-symbols-outlined text-primary text-xl">notifications</span>
-              <span className="flex-1 text-white text-sm font-semibold">{t.notifications}</span>
-              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
-            </button>
+            {[
+              { icon: 'person', label: lang === 'tr' ? 'Kişisel Bilgiler' : 'Personal Info', modal: 'personalInfo' as ModalType },
+              { icon: 'lock', label: lang === 'tr' ? 'Şifre Değiştir' : 'Change Password', modal: 'password' as ModalType },
+              { icon: 'notifications', label: t.notifications, modal: 'notifications' as ModalType },
+            ].map(item => (
+              <button
+                key={item.icon}
+                onClick={() => setActiveModal(item.modal)}
+                className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors w-full text-left"
+              >
+                <span className="material-symbols-outlined text-primary text-xl">{item.icon}</span>
+                <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{item.label}</span>
+                <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* App settings */}
         <div>
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 px-1">
+          <p className="text-[10px] font-black text-slate-400 dark:text-white/40 uppercase tracking-widest mb-2 px-1">
             {lang === 'tr' ? 'Uygulama' : 'App'}
           </p>
           <div className="flex flex-col gap-2">
             {/* Appearance - inline toggle */}
-            <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-xl">dark_mode</span>
-              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Görünüm' : 'Appearance'}</span>
+            <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors">
+              <span className="material-symbols-outlined text-primary text-xl">
+                {isDarkMode ? 'dark_mode' : 'light_mode'}
+              </span>
+              <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Görünüm' : 'Appearance'}</span>
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDarkMode ? 'bg-primary' : 'bg-white/20'}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDarkMode ? 'bg-primary' : 'bg-slate-300'}`}
               >
                 <span className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
-              <span className="text-xs text-white/40 font-semibold ml-1 w-12 text-right">
+              <span className="text-xs text-slate-500 dark:text-white/40 font-semibold ml-1 w-12 text-right">
                 {isDarkMode ? (lang === 'tr' ? 'Koyu' : 'Dark') : (lang === 'tr' ? 'Açık' : 'Light')}
               </span>
             </div>
 
             {/* Language - inline toggle */}
-            <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3">
+            <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors">
               <span className="material-symbols-outlined text-primary text-xl">language</span>
-              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Dil / Language' : 'Language / Dil'}</span>
+              <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Dil / Language' : 'Language / Dil'}</span>
               <button
                 onClick={() => setLang(lang === 'tr' ? 'en' : 'tr')}
                 className="flex items-center gap-1 bg-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition-colors active:scale-95"
               >
                 <span className="text-xs font-black text-primary">{lang === 'tr' ? 'TR' : 'EN'}</span>
                 <span className="material-symbols-outlined text-primary text-sm">swap_horiz</span>
-                <span className="text-xs font-black text-white/40">{lang === 'tr' ? 'EN' : 'TR'}</span>
+                <span className="text-xs font-black text-slate-400 dark:text-white/40">{lang === 'tr' ? 'EN' : 'TR'}</span>
               </button>
             </div>
 
             {/* Help */}
             <button
               onClick={() => setActiveModal('help')}
-              className="bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-white/5 transition-colors w-full text-left"
+              className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors w-full text-left"
             >
               <span className="material-symbols-outlined text-primary text-xl">help</span>
-              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Yardım' : 'Help & Support'}</span>
-              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+              <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Yardım' : 'Help & Support'}</span>
+              <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
             </button>
           </div>
         </div>
@@ -269,6 +292,68 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
       </div>
 
       <BottomNav role={role} lang={lang} />
+
+      {/* Settings Modal (gear icon) */}
+      {activeModal === 'settings' && (
+        <Modal title={lang === 'tr' ? 'Ayarlar' : 'Settings'} onClose={() => setActiveModal(null)}>
+          <div className="flex flex-col gap-3">
+            {/* Appearance toggle */}
+            <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-xl">{isDarkMode ? 'dark_mode' : 'light_mode'}</span>
+                <span className="text-white text-sm font-semibold">{lang === 'tr' ? 'Görünüm' : 'Appearance'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40 font-semibold">
+                  {isDarkMode ? (lang === 'tr' ? 'Koyu' : 'Dark') : (lang === 'tr' ? 'Açık' : 'Light')}
+                </span>
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDarkMode ? 'bg-primary' : 'bg-slate-400'}`}
+                >
+                  <span className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Language toggle */}
+            <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-xl">language</span>
+                <span className="text-white text-sm font-semibold">{lang === 'tr' ? 'Dil / Language' : 'Language / Dil'}</span>
+              </div>
+              <button
+                onClick={() => setLang(lang === 'tr' ? 'en' : 'tr')}
+                className="flex items-center gap-1 bg-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition-colors active:scale-95"
+              >
+                <span className="text-xs font-black text-primary">{lang === 'tr' ? 'TR' : 'EN'}</span>
+                <span className="material-symbols-outlined text-primary text-sm">swap_horiz</span>
+                <span className="text-xs font-black text-white/40">{lang === 'tr' ? 'EN' : 'TR'}</span>
+              </button>
+            </div>
+
+            {/* Notifications */}
+            <button
+              onClick={() => setActiveModal('notifications')}
+              className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3.5 hover:bg-white/10 transition-colors w-full text-left"
+            >
+              <span className="material-symbols-outlined text-primary text-xl">notifications</span>
+              <span className="flex-1 text-white text-sm font-semibold">{t.notifications}</span>
+              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+            </button>
+
+            {/* Help */}
+            <button
+              onClick={() => setActiveModal('help')}
+              className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3.5 hover:bg-white/10 transition-colors w-full text-left"
+            >
+              <span className="material-symbols-outlined text-primary text-xl">help</span>
+              <span className="flex-1 text-white text-sm font-semibold">{lang === 'tr' ? 'Yardım' : 'Help & Support'}</span>
+              <span className="material-symbols-outlined text-white/20 text-lg">chevron_right</span>
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {/* Personal Info Modal */}
       {activeModal === 'personalInfo' && (
@@ -294,8 +379,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
             >
               {infoSaved
                 ? <><span className="material-symbols-outlined text-lg">check_circle</span>{lang === 'tr' ? 'Kaydedildi!' : 'Saved!'}</>
-                : <>{lang === 'tr' ? 'Kaydet' : 'Save'}</>
-              }
+                : <>{lang === 'tr' ? 'Kaydet' : 'Save'}</>}
             </button>
           </div>
         </Modal>
@@ -324,8 +408,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
             >
               {pwSuccess
                 ? <><span className="material-symbols-outlined text-lg">check_circle</span>{lang === 'tr' ? 'Değiştirildi!' : 'Changed!'}</>
-                : <>{lang === 'tr' ? 'Şifreyi Değiştir' : 'Change Password'}</>
-              }
+                : <>{lang === 'tr' ? 'Şifreyi Değiştir' : 'Change Password'}</>}
             </button>
           </div>
         </Modal>
