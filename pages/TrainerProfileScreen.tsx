@@ -26,13 +26,26 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [notifMessages, setNotifMessages] = useState(true);
   const [notifProgress, setNotifProgress] = useState(false);
 
+  // Read user info from localStorage first
+  const userStr = localStorage.getItem('fittrack_user');
+  let parsedUser: Record<string, string> = {};
+  try {
+    if (userStr) parsedUser = JSON.parse(userStr);
+  } catch { /* ignore */ }
+
   // Avatar state – read from localStorage
+  const gender = parsedUser.gender || localStorage.getItem('fittrack_gender') || 'male';
   const [avatarSrc, setAvatarSrc] = useState<string>(
-    localStorage.getItem('fittrack_avatar') || 'https://picsum.photos/seed/trainer/200/200'
+    localStorage.getItem('fittrack_avatar') || ''
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const hasCustomAvatar = !!avatarSrc;
   const handleAvatarClick = () => fileInputRef.current?.click();
+  const handleAvatarDelete = () => {
+    localStorage.removeItem('fittrack_avatar');
+    setAvatarSrc('');
+  };
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -43,16 +56,8 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
       localStorage.setItem('fittrack_avatar', base64);
     };
     reader.readAsDataURL(file);
-    // reset input so same file can be selected again
     e.target.value = '';
   };
-
-  // Read user info from localStorage
-  const userStr = localStorage.getItem('fittrack_user');
-  let parsedUser: Record<string, string> = {};
-  try {
-    if (userStr) parsedUser = JSON.parse(userStr);
-  } catch { /* ignore */ }
 
   const [firstName, setFirstName] = useState(parsedUser.firstName || '');
   const [lastName, setLastName] = useState(parsedUser.lastName || '');
@@ -66,7 +71,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [pwSuccess, setPwSuccess] = useState(false);
 
   const storedName = userName || (parsedUser.firstName && parsedUser.lastName ? `${parsedUser.firstName} ${parsedUser.lastName}` : '');
-  const displayName = storedName || (lang === 'tr' ? 'Antrenör' : 'Trainer');
+  const displayName = storedName || (isTrainer ? (lang === 'tr' ? 'Antrenör' : 'Trainer') : (lang === 'tr' ? 'Öğrenci' : 'Student'));
   const storedEmail = parsedUser.email || '';
 
   const handleLogout = () => {
@@ -165,17 +170,60 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
             onChange={handleAvatarChange}
           />
           <div className="relative">
-            <img
-              src={avatarSrc}
-              alt={displayName}
-              className="size-24 rounded-3xl border-2 border-primary/40 object-cover"
-            />
+            {hasCustomAvatar ? (
+              <img
+                src={avatarSrc}
+                alt={displayName}
+                className="size-24 rounded-3xl border-2 border-primary/40 object-cover"
+              />
+            ) : (
+              <div className="size-24 rounded-3xl border-2 border-primary/40 overflow-hidden">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                  {gender === 'female' ? (
+                    <>
+                      <rect width="100" height="100" fill="#e8d5f0"/>
+                      {/* Hair */}
+                      <ellipse cx="50" cy="30" rx="22" ry="18" fill="#b388d8"/>
+                      <ellipse cx="30" cy="42" rx="7" ry="14" fill="#b388d8"/>
+                      <ellipse cx="70" cy="42" rx="7" ry="14" fill="#b388d8"/>
+                      {/* Head */}
+                      <ellipse cx="50" cy="38" rx="18" ry="20" fill="#ce9fd6"/>
+                      {/* Neck */}
+                      <rect x="44" y="56" width="12" height="8" fill="#ce9fd6"/>
+                      {/* Body/shoulders */}
+                      <ellipse cx="50" cy="92" rx="34" ry="22" fill="#b388d8"/>
+                    </>
+                  ) : (
+                    <>
+                      <rect width="100" height="100" fill="#d0e8f8"/>
+                      {/* Hair */}
+                      <ellipse cx="50" cy="27" rx="20" ry="13" fill="#4a85b8"/>
+                      {/* Head */}
+                      <ellipse cx="50" cy="38" rx="18" ry="20" fill="#7ab3d8"/>
+                      {/* Neck */}
+                      <rect x="44" y="56" width="12" height="8" fill="#7ab3d8"/>
+                      {/* Body/shoulders */}
+                      <ellipse cx="50" cy="92" rx="34" ry="22" fill="#4a85b8"/>
+                    </>
+                  )}
+                </svg>
+              </div>
+            )}
             <button
               onClick={handleAvatarClick}
               className="absolute bottom-0 right-0 bg-primary text-white rounded-full size-8 flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors active:scale-95"
             >
               <span className="material-symbols-outlined text-sm">photo_camera</span>
             </button>
+            {hasCustomAvatar && (
+              <button
+                onClick={handleAvatarDelete}
+                className="absolute top-0 right-0 bg-red-500 text-white rounded-full size-6 flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors active:scale-95"
+                title={lang === 'tr' ? 'Fotoğrafı Sil' : 'Remove Photo'}
+              >
+                <span className="material-symbols-outlined text-xs">close</span>
+              </button>
+            )}
           </div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white">{displayName}</h2>
           <span className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
