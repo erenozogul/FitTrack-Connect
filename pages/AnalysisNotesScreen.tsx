@@ -16,8 +16,18 @@ interface AnalysisNotesProps {
   role?: 'trainer' | 'student';
 }
 
-const STORAGE_KEY = 'fittrack_notes';
+const STUDENT_STORAGE_KEY = 'fittrack_notes';
 const NOTIF_KEY = 'fittrack_note_notification';
+
+const mockStudents = [
+  { id: 1, name: 'Ayşe Kaya',     avatar: 'https://picsum.photos/seed/ayse/100/100' },
+  { id: 2, name: 'Mehmet Yılmaz', avatar: 'https://picsum.photos/seed/mehmet/100/100' },
+  { id: 3, name: 'Zeynep Şahin',  avatar: 'https://picsum.photos/seed/zeynep/100/100' },
+  { id: 4, name: 'Can Öztürk',    avatar: 'https://picsum.photos/seed/can/100/100' },
+  { id: 5, name: 'Selin Arslan',  avatar: 'https://picsum.photos/seed/selin/100/100' },
+];
+
+const getTrainerKey = (studentId: number) => `fittrack_notes_trainer_${studentId}`;
 
 const getSampleNotes = (): Note[] => {
   const now = new Date();
@@ -51,18 +61,34 @@ const getSampleNotes = (): Note[] => {
   ];
 };
 
-const loadNotes = (): Note[] => {
+const loadStudentNotes = (): Note[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STUDENT_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   const sample = getSampleNotes();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
+  localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(sample));
   return sample;
 };
 
-const saveNotes = (notes: Note[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+const loadTrainerNotes = (studentId: number): Note[] => {
+  try {
+    const raw = localStorage.getItem(getTrainerKey(studentId));
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+};
+
+const saveStudentNotes = (notes: Note[]) => {
+  localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(notes));
+};
+
+const saveTrainerNotes = (studentId: number, notes: Note[]) => {
+  localStorage.setItem(getTrainerKey(studentId), JSON.stringify(notes));
+  // Also sync to student's own storage key so they can read it
+  localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(notes));
+  const unreadCount = notes.filter(n => !n.isRead).length;
+  localStorage.setItem(NOTIF_KEY, JSON.stringify({ count: unreadCount, lastDate: new Date().toISOString() }));
 };
 
 const relativeDate = (isoDate: string, lang: 'tr' | 'en'): string => {
@@ -78,25 +104,42 @@ const relativeDate = (isoDate: string, lang: 'tr' | 'en'): string => {
 };
 
 const categoryConfig = {
-  form: { label: { tr: 'Form', en: 'Form' }, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  nutrition: { label: { tr: 'Beslenme', en: 'Nutrition' }, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-  progress: { label: { tr: 'İlerleme', en: 'Progress' }, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  general: { label: { tr: 'Genel', en: 'General' }, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  form:      { label: { tr: 'Form',      en: 'Form'      }, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30'     },
+  nutrition: { label: { tr: 'Beslenme',  en: 'Nutrition' }, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  progress:  { label: { tr: 'İlerleme',  en: 'Progress'  }, color: 'bg-green-500/20 text-green-400 border-green-500/30'   },
+  general:   { label: { tr: 'Genel',     en: 'General'   }, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30'      },
 };
 
 const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'student' }) => {
   const isTrainer = role === 'trainer';
 
-  const [notes, setNotes] = useState<Note[]>(() => {
-    const loaded = loadNotes();
-    // If student, mark all as read on init
+  // Student state
+  const [studentNotes, setStudentNotes] = useState<Note[]>(() => {
+    const loaded = loadStudentNotes();
     if (!isTrainer) {
       const updated = loaded.map(n => ({ ...n, isRead: true }));
-      saveNotes(updated);
+      saveStudentNotes(updated);
       return updated;
     }
     return loaded;
   });
+
+  // Trainer state
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [trainerNotes, setTrainerNotes] = useState<Note[]>([]);
+
+  const handleSelectStudent = (id: number) => {
+    if (selectedStudentId === id) {
+      setSelectedStudentId(null);
+      setTrainerNotes([]);
+    } else {
+      setSelectedStudentId(id);
+      setTrainerNotes(loadTrainerNotes(id));
+    }
+    setActiveFilter('all');
+  };
+
+  const notes = isTrainer ? trainerNotes : studentNotes;
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'form' | 'nutrition' | 'progress' | 'general'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -107,7 +150,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
   const filteredNotes = activeFilter === 'all' ? notes : notes.filter(n => n.category === activeFilter);
 
   const handleAddNote = () => {
-    if (!newContent.trim()) return;
+    if (!newContent.trim() || !selectedStudentId) return;
     const newNote: Note = {
       id: Date.now().toString(),
       content: newContent.trim(),
@@ -115,30 +158,35 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
       date: new Date().toISOString(),
       isRead: false,
     };
-    const updated = [newNote, ...notes];
-    setNotes(updated);
-    saveNotes(updated);
-    // Save notification
-    const unreadCount = updated.filter(n => !n.isRead).length;
-    localStorage.setItem(NOTIF_KEY, JSON.stringify({ count: unreadCount, lastDate: new Date().toISOString() }));
+    const updated = [newNote, ...trainerNotes];
+    setTrainerNotes(updated);
+    saveTrainerNotes(selectedStudentId, updated);
     setNewContent('');
     setNewCategory('general');
     setShowAddModal(false);
   };
 
   const handleDeleteNote = (id: string) => {
-    const updated = notes.filter(n => n.id !== id);
-    setNotes(updated);
-    saveNotes(updated);
+    if (isTrainer && selectedStudentId) {
+      const updated = trainerNotes.filter(n => n.id !== id);
+      setTrainerNotes(updated);
+      saveTrainerNotes(selectedStudentId, updated);
+    } else {
+      const updated = studentNotes.filter(n => n.id !== id);
+      setStudentNotes(updated);
+      saveStudentNotes(updated);
+    }
   };
 
   const filterPills = [
-    { key: 'all' as const, label: lang === 'tr' ? 'Tümü' : 'All' },
-    { key: 'form' as const, label: lang === 'tr' ? 'Form' : 'Form' },
+    { key: 'all'       as const, label: lang === 'tr' ? 'Tümü'     : 'All'       },
+    { key: 'form'      as const, label: lang === 'tr' ? 'Form'     : 'Form'      },
     { key: 'nutrition' as const, label: lang === 'tr' ? 'Beslenme' : 'Nutrition' },
-    { key: 'progress' as const, label: lang === 'tr' ? 'İlerleme' : 'Progress' },
-    { key: 'general' as const, label: lang === 'tr' ? 'Genel' : 'General' },
+    { key: 'progress'  as const, label: lang === 'tr' ? 'İlerleme' : 'Progress'  },
+    { key: 'general'   as const, label: lang === 'tr' ? 'Genel'    : 'General'   },
   ];
+
+  const selectedStudent = mockStudents.find(s => s.id === selectedStudentId);
 
   return (
     <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
@@ -148,7 +196,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
           <h1 className="text-xl font-black text-white">
             {lang === 'tr' ? 'Analiz Notları' : 'Analysis Notes'}
           </h1>
-          {isTrainer && (
+          {isTrainer && selectedStudentId && (
             <button
               onClick={() => setShowAddModal(true)}
               className="size-10 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
@@ -158,83 +206,160 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
           )}
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3 max-w-2xl mx-auto pb-1">
-          {filterPills.map(pill => (
-            <button
-              key={pill.key}
-              onClick={() => setActiveFilter(pill.key)}
-              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
-                activeFilter === pill.key
-                  ? 'bg-primary text-white shadow-md shadow-primary/20'
-                  : 'bg-white/5 text-white/50 hover:bg-white/10'
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
-        </div>
+        {/* Filter pills — only shown when student selected (trainer) or always (student) */}
+        {(!isTrainer || selectedStudentId) && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3 max-w-2xl mx-auto pb-1">
+            {filterPills.map(pill => (
+              <button
+                key={pill.key}
+                onClick={() => setActiveFilter(pill.key)}
+                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
+                  activeFilter === pill.key
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                    : 'bg-white/5 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="px-4 py-4 max-w-2xl mx-auto flex flex-col gap-3">
-        {filteredNotes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="size-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-4xl text-white/20">edit_note</span>
-            </div>
-            <div className="text-center">
-              <p className="text-white/40 text-sm font-semibold">
-                {lang === 'tr' ? 'Henüz not yok' : 'No notes yet'}
-              </p>
-              {isTrainer && (
-                <p className="text-white/20 text-xs mt-1">
-                  {lang === 'tr' ? 'Not eklemek için + butonuna tıkla' : 'Tap + to add a note'}
-                </p>
-              )}
-            </div>
-          </div>
-        ) : (
-          filteredNotes.map(note => {
-            const cfg = categoryConfig[note.category];
-            return (
-              <div
-                key={note.id}
-                className="bg-card-dark rounded-2xl border border-white/5 p-4 flex flex-col gap-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${cfg.color}`}>
-                      {cfg.label[lang]}
-                    </span>
-                    <span className="text-[10px] text-white/30 font-semibold">
-                      {relativeDate(note.date, lang)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isTrainer && !note.isRead && (
-                      <span className="size-2 bg-blue-500 rounded-full flex-shrink-0" />
+
+        {/* === TRAINER VIEW === */}
+        {isTrainer && (
+          <>
+            {/* Student list */}
+            <div className="flex flex-col gap-2 mb-1">
+              {mockStudents.map(student => {
+                const isSelected = selectedStudentId === student.id;
+                const noteCount = loadTrainerNotes(student.id).length;
+                return (
+                  <div key={student.id}>
+                    <button
+                      onClick={() => handleSelectStudent(student.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all active:scale-[0.99] ${
+                        isSelected
+                          ? 'bg-primary/10 border-primary/30'
+                          : 'bg-card-dark border-white/5 hover:bg-white/5'
+                      }`}
+                    >
+                      <img
+                        src={student.avatar}
+                        alt={student.name}
+                        className={`size-10 rounded-full object-cover border-2 ${isSelected ? 'border-primary' : 'border-white/10'}`}
+                      />
+                      <div className="flex-1 text-left">
+                        <p className={`text-sm font-bold ${isSelected ? 'text-primary' : 'text-white'}`}>{student.name}</p>
+                        <p className="text-[10px] text-white/30 font-semibold mt-0.5">
+                          {noteCount > 0
+                            ? `${noteCount} ${lang === 'tr' ? 'not' : 'note'}`
+                            : lang === 'tr' ? 'Henüz not yok' : 'No notes yet'}
+                        </p>
+                      </div>
+                      <span className={`material-symbols-outlined text-lg transition-transform ${isSelected ? 'text-primary rotate-180' : 'text-white/20'}`}>
+                        expand_more
+                      </span>
+                    </button>
+
+                    {/* Expanded notes for this student */}
+                    {isSelected && (
+                      <div className="mt-2 flex flex-col gap-2 pl-2">
+                        {filteredNotes.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-8 gap-3">
+                            <div className="size-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                              <span className="material-symbols-outlined text-2xl text-white/20">edit_note</span>
+                            </div>
+                            <p className="text-white/30 text-xs font-semibold text-center">
+                              {lang === 'tr' ? `${student.name} için henüz not yok` : `No notes for ${student.name} yet`}
+                            </p>
+                          </div>
+                        ) : (
+                          filteredNotes.map(note => {
+                            const cfg = categoryConfig[note.category];
+                            return (
+                              <div
+                                key={note.id}
+                                className="bg-card-dark rounded-2xl border border-white/5 p-4 flex flex-col gap-2.5"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${cfg.color}`}>
+                                      {cfg.label[lang]}
+                                    </span>
+                                    <span className="text-[10px] text-white/30 font-semibold">
+                                      {relativeDate(note.date, lang)}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    className="size-7 rounded-lg bg-white/5 flex items-center justify-center text-red-400 hover:bg-red-500/10 active:scale-95 transition-all"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                  </button>
+                                </div>
+                                <p className="text-white text-sm leading-relaxed">{note.content}</p>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     )}
-                    {isTrainer && (
-                      <button
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="size-7 rounded-lg bg-white/5 flex items-center justify-center text-red-400 hover:bg-red-500/10 active:scale-95 transition-all"
-                      >
-                        <span className="material-symbols-outlined text-sm">delete</span>
-                      </button>
-                    )}
                   </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* === STUDENT VIEW === */}
+        {!isTrainer && (
+          <>
+            {filteredNotes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="size-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-4xl text-white/20">edit_note</span>
                 </div>
-                <p className="text-white text-sm leading-relaxed">{note.content}</p>
+                <p className="text-white/40 text-sm font-semibold">
+                  {lang === 'tr' ? 'Henüz not yok' : 'No notes yet'}
+                </p>
               </div>
-            );
-          })
+            ) : (
+              filteredNotes.map(note => {
+                const cfg = categoryConfig[note.category];
+                return (
+                  <div
+                    key={note.id}
+                    className="bg-card-dark rounded-2xl border border-white/5 p-4 flex flex-col gap-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${cfg.color}`}>
+                          {cfg.label[lang]}
+                        </span>
+                        <span className="text-[10px] text-white/30 font-semibold">
+                          {relativeDate(note.date, lang)}
+                        </span>
+                      </div>
+                      {!note.isRead && (
+                        <span className="size-2 bg-blue-500 rounded-full flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-white text-sm leading-relaxed">{note.content}</p>
+                  </div>
+                );
+              })
+            )}
+          </>
         )}
       </div>
 
       <BottomNav role={role} lang={lang} />
 
       {/* Add Note Modal (trainer only) */}
-      {showAddModal && (
+      {showAddModal && selectedStudent && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center"
           onClick={() => setShowAddModal(false)}
@@ -244,9 +369,12 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-black text-white">
-                {lang === 'tr' ? 'Not Ekle' : 'Add Note'}
-              </h2>
+              <div>
+                <h2 className="text-base font-black text-white">
+                  {lang === 'tr' ? 'Not Ekle' : 'Add Note'}
+                </h2>
+                <p className="text-xs text-white/40 mt-0.5">{selectedStudent.name}</p>
+              </div>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10"
@@ -265,10 +393,10 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 flex items-center justify-between"
               >
                 <span>
-                  {newCategory === 'form' && (lang === 'tr' ? 'Form' : 'Form')}
-                  {newCategory === 'nutrition' && (lang === 'tr' ? 'Beslenme' : 'Nutrition')}
-                  {newCategory === 'progress' && (lang === 'tr' ? 'İlerleme' : 'Progress')}
-                  {newCategory === 'general' && (lang === 'tr' ? 'Genel' : 'General')}
+                  {newCategory === 'form'      && (lang === 'tr' ? 'Form'     : 'Form'      )}
+                  {newCategory === 'nutrition' && (lang === 'tr' ? 'Beslenme' : 'Nutrition' )}
+                  {newCategory === 'progress'  && (lang === 'tr' ? 'İlerleme' : 'Progress'  )}
+                  {newCategory === 'general'   && (lang === 'tr' ? 'Genel'    : 'General'   )}
                 </span>
                 <span className="material-symbols-outlined text-white/50 text-base">
                   {showCategoryDropdown ? 'expand_less' : 'expand_more'}
@@ -277,10 +405,10 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
               {showCategoryDropdown && (
                 <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl">
                   {[
-                    { value: 'form', label: lang === 'tr' ? 'Form' : 'Form' },
+                    { value: 'form',      label: lang === 'tr' ? 'Form'     : 'Form'      },
                     { value: 'nutrition', label: lang === 'tr' ? 'Beslenme' : 'Nutrition' },
-                    { value: 'progress', label: lang === 'tr' ? 'İlerleme' : 'Progress' },
-                    { value: 'general', label: lang === 'tr' ? 'Genel' : 'General' },
+                    { value: 'progress',  label: lang === 'tr' ? 'İlerleme' : 'Progress'  },
+                    { value: 'general',   label: lang === 'tr' ? 'Genel'    : 'General'   },
                   ].map(opt => (
                     <button
                       key={opt.value}
