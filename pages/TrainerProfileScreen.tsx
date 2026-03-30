@@ -3,6 +3,12 @@ import React, { useState, useRef } from 'react';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
+const mockTrainers = [
+  { id: 0, name: 'Coach Mike', specialty: 'Strength & Conditioning', avatar: 'https://picsum.photos/seed/mike/100/100', code: 'MIKE2026', rating: 4.9, students: 24, years: 8 },
+  { id: 1, name: 'Coach Sara', specialty: 'Fat Loss & Cardio', avatar: 'https://picsum.photos/seed/sara/100/100', code: 'SARA2026', rating: 4.8, students: 18, years: 5 },
+  { id: 2, name: 'Coach Ahmet', specialty: 'Powerlifting', avatar: 'https://picsum.photos/seed/ahmet/100/100', code: 'AHMET2026', rating: 4.7, students: 31, years: 12 },
+];
+
 interface TrainerProfileScreenProps {
   lang: 'tr' | 'en';
   setLang: (l: 'tr' | 'en') => void;
@@ -14,6 +20,137 @@ interface TrainerProfileScreenProps {
 }
 
 type ModalType = 'personalInfo' | 'password' | 'notifications' | 'help' | 'settings' | null;
+
+/* ──────────────────────────────────────────────────
+   ConnectTrainerSection – shown on student profile
+   when no trainer is connected yet
+────────────────────────────────────────────────── */
+const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
+  const [inviteCode, setInviteCode] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [connected, setConnected] = useState<typeof mockTrainers[0] | null>(() => {
+    try { return JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null'); } catch { return null; }
+  });
+
+  const handleConnect = async (trainer?: typeof mockTrainers[0]) => {
+    const code = trainer ? trainer.code : inviteCode.trim().toUpperCase();
+    if (!code) { setError(lang === 'tr' ? 'Lütfen bir kod girin.' : 'Please enter a code.'); return; }
+    setLoading(true); setError('');
+
+    // Find in mock list first
+    const found = mockTrainers.find(t => t.code === code) || trainer;
+    if (!found) {
+      setError(lang === 'tr' ? 'Geçersiz kod. Lütfen tekrar deneyin.' : 'Invalid code. Please try again.');
+      setLoading(false);
+      return;
+    }
+
+    // Try real API (best-effort — don't block on failure)
+    try {
+      const token = localStorage.getItem('fittrack_token');
+      if (token) {
+        await fetch('/api/trainer/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ inviteCode: code }),
+        });
+      }
+    } catch { /* ignore network errors */ }
+
+    localStorage.setItem('fittrack_connected_trainer', JSON.stringify(found));
+    setConnected(found);
+    setLoading(false);
+  };
+
+  if (connected) {
+    return (
+      <div className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 rounded-2xl p-4 mb-4">
+        <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-2">
+          {lang === 'tr' ? 'Antrenörüm' : 'My Trainer'}
+        </p>
+        <div className="flex items-center gap-3">
+          <img src={connected.avatar} alt={connected.name} className="size-10 rounded-full object-cover border-2 border-primary/30" />
+          <div>
+            <p className="text-white font-bold text-sm">{connected.name}</p>
+            <p className="text-white/40 text-xs">{connected.specialty}</p>
+          </div>
+          <button
+            onClick={() => { localStorage.removeItem('fittrack_connected_trainer'); setConnected(null); }}
+            className="ml-auto text-white/30 hover:text-red-400 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">link_off</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3 px-1">
+        <span className="material-symbols-outlined text-primary text-lg">person_search</span>
+        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+          {lang === 'tr' ? 'Antrenör Bağla' : 'Connect Trainer'}
+        </p>
+      </div>
+
+      {/* Trainer list */}
+      <div className="flex flex-col gap-2 mb-3">
+        {mockTrainers.map(tr => (
+          <div key={tr.id} className="flex items-center gap-3 bg-card-dark border border-white/5 rounded-2xl px-4 py-3">
+            <img src={tr.avatar} alt={tr.name} className="size-10 rounded-full object-cover border-2 border-white/10 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold text-sm">{tr.name}</p>
+              <p className="text-white/40 text-xs">{tr.specialty}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-yellow-400 font-bold">★ {tr.rating}</span>
+                <span className="text-[10px] text-white/30">• {tr.students} {lang === 'tr' ? 'öğrenci' : 'students'}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => handleConnect(tr)}
+              disabled={loading}
+              className="flex-shrink-0 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {lang === 'tr' ? 'Seç' : 'Select'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-[10px] text-white/30 font-bold uppercase">{lang === 'tr' ? 'veya kod ile' : 'or with code'}</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      {/* Code input */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={inviteCode}
+          onChange={e => { setInviteCode(e.target.value.toUpperCase()); setError(''); }}
+          placeholder={lang === 'tr' ? 'Davet kodu girin...' : 'Enter invite code...'}
+          className="flex-1 bg-card-dark border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm outline-none focus:border-primary/50 transition-colors font-mono tracking-widest"
+        />
+        <button
+          onClick={() => handleConnect()}
+          disabled={loading || !inviteCode.trim()}
+          className="px-4 py-3 bg-primary text-white rounded-xl font-black text-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40"
+        >
+          {loading
+            ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+            : <span className="material-symbols-outlined text-lg">link</span>
+          }
+        </button>
+      </div>
+      {error && <p className="text-red-400 text-xs font-semibold mt-2 px-1">{error}</p>}
+    </div>
+  );
+};
 
 const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   lang, setLang, onLogout, userName, role = 'trainer', isDarkMode, setIsDarkMode
@@ -303,32 +440,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
               </p>
             </div>
           )}
-          {!isTrainer && (() => {
-            try {
-              const ct = JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null');
-              if (!ct) return null;
-              return (
-                <div className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 rounded-2xl p-4 mb-4">
-                  <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mb-2">
-                    {lang === 'tr' ? 'Antrenörüm' : 'My Trainer'}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <img src={ct.avatar} alt={ct.name} className="size-10 rounded-full object-cover border-2 border-primary/30" />
-                    <div>
-                      <p className="text-white font-bold text-sm">{ct.name}</p>
-                      <p className="text-white/40 text-xs">{ct.specialty}</p>
-                    </div>
-                    <button
-                      onClick={() => { localStorage.removeItem('fittrack_connected_trainer'); window.location.reload(); }}
-                      className="ml-auto text-white/30 hover:text-red-400 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-lg">link_off</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            } catch { return null; }
-          })()}
+          {!isTrainer && <ConnectTrainerSection lang={lang} />}
           <div className="flex flex-col gap-2">
             {[
               { icon: 'person', label: lang === 'tr' ? 'Kişisel Bilgiler' : 'Personal Info', modal: 'personalInfo' as ModalType },
