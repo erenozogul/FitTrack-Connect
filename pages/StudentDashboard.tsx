@@ -104,6 +104,25 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     setUnreadCount(getUnreadCount());
   }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    fetch('/api/assignments', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        if (!data.length) return;
+        // Convert flat array to localStorage format grouped by date
+        const grouped: Record<string, any[]> = {};
+        data.forEach(a => {
+          const key = typeof a.assignedDate === 'string' ? a.assignedDate.split('T')[0] : a.assignedDate;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push({ studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime });
+        });
+        localStorage.setItem('fittrack_assignments', JSON.stringify(grouped));
+      })
+      .catch(() => {});
+  }, []);
+
   // Read real user data from localStorage
   const storedUser = (() => { try { return JSON.parse(localStorage.getItem('fittrack_user') || '{}'); } catch { return {}; } })();
   const storedAvatar = localStorage.getItem('fittrack_avatar') || null;

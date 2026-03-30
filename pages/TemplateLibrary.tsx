@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 import { addNotification } from '../utils/notifications';
+import { api } from '../utils/api';
 
 interface Exercise {
   id: string;
@@ -932,21 +933,32 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     { id: 5, name: 'Selin Arslan' },
   ];
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     const student = mockStudents.find(s => s.id === assignStudentId);
     if (!student || !assignTarget) return;
     try {
+      // Save to DB
+      await api.post('/api/assignments', {
+        studentId: student.id,
+        studentName: student.name,
+        workoutId: assignTarget.id,
+        workoutName: assignTarget.name[lang],
+        assignedDate: assignDate,
+        startTime: assignStartTime,
+        endTime: assignEndTime,
+      });
+      // Also keep localStorage in sync for dashboard
       const existing = JSON.parse(localStorage.getItem('fittrack_assignments') || '{}');
       const key = assignDate;
       const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang], startTime: assignStartTime, endTime: assignEndTime };
       existing[key] = [...(existing[key] || []), newEntry];
       localStorage.setItem('fittrack_assignments', JSON.stringify(existing));
-      addNotification({
-        type: 'assignment',
-        title: lang === 'tr' ? 'Yeni Antrenman Atandı' : 'New Workout Assigned',
-        body: `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
-      });
     } catch { /* ignore */ }
+    addNotification({
+      type: 'assignment',
+      title: lang === 'tr' ? 'Yeni Antrenman Atandı' : 'New Workout Assigned',
+      body: `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
+    });
     setAssignSuccess(true);
     setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); }, 1200);
   };

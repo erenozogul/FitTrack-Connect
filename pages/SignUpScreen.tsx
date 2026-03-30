@@ -72,7 +72,14 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
     }
   };
 
-  const handleSelectTrainer = (trainer: typeof mockTrainers[number]) => {
+  const handleSelectTrainer = async (trainer: typeof mockTrainers[number]) => {
+    try {
+      await fetch('/api/trainer/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fittrack_token')}` },
+        body: JSON.stringify({ inviteCode: trainer.code }),
+      });
+    } catch { /* ignore if API fails, localStorage still works */ }
     localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
     addNotification({
       type: 'system',
@@ -82,9 +89,31 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
     navigate('/dashboard');
   };
 
-  const handleConnectByCode = () => {
+  const handleConnectByCode = async () => {
     setCodeError('');
-    const found = mockTrainers.find(tr => tr.code === inviteCode.trim().toUpperCase());
+    const code = inviteCode.trim().toUpperCase();
+    // First try to connect via API
+    try {
+      const res = await fetch('/api/trainer/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fittrack_token')}` },
+        body: JSON.stringify({ inviteCode: code }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const trainer = data.trainer;
+        localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
+        addNotification({
+          type: 'system',
+          title: lang === 'tr' ? `${trainer.name} ile bağlantı kuruldu!` : `Connected with ${trainer.name}!`,
+          body: lang === 'tr' ? 'Antrenörünüz sizin için program oluşturabilir ve sizi takip edebilir.' : 'Your trainer can now create programs and track your progress.',
+        });
+        navigate('/dashboard');
+        return;
+      }
+    } catch { /* fall through to mock */ }
+    // Fallback to mock trainers
+    const found = mockTrainers.find(tr => tr.code === code);
     if (!found) {
       setCodeError(lang === 'tr' ? 'Geçersiz davet kodu' : 'Invalid invite code');
       return;
