@@ -244,6 +244,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <h1 className="text-lg font-bold leading-tight text-white">{profileData.name}</h1>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Chat button */}
+          <button
+            onClick={() => navigate('/messages')}
+            className="relative p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors"
+          >
+            <span className="material-symbols-outlined">chat_bubble</span>
+          </button>
+
         <div className="relative">
           <button
             onClick={() => {
@@ -300,6 +309,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               </div>
             </>
           )}
+        </div>
         </div>
       </header>
 
