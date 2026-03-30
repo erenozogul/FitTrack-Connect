@@ -26,11 +26,6 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
   const [inviteCode, setInviteCode] = useState('');
   const [codeError, setCodeError] = useState('');
 
-  const mockTrainers = [
-    { id: 1, name: 'Coach Mike', specialty: lang === 'tr' ? 'Güç & Kondisyon' : 'Strength & Conditioning', avatar: 'https://picsum.photos/seed/mike/100/100', code: 'MIKE2026', students: 12, rating: '4.9' },
-    { id: 2, name: 'Coach Sara', specialty: lang === 'tr' ? 'Fonksiyonel Antrenman' : 'Functional Training', avatar: 'https://picsum.photos/seed/sara/100/100', code: 'SARA2026', students: 8, rating: '4.7' },
-    { id: 3, name: 'Coach Ahmet', specialty: lang === 'tr' ? 'Hipertrofi & Beslenme' : 'Hypertrophy & Nutrition', avatar: 'https://picsum.photos/seed/ahmet/100/100', code: 'AHMET2026', students: 15, rating: '4.8' },
-  ];
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,53 +67,32 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
     }
   };
 
-  const handleSelectTrainer = async (trainer: typeof mockTrainers[number]) => {
-    try {
-      await fetch('/api/trainer/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fittrack_token')}` },
-        body: JSON.stringify({ inviteCode: trainer.code }),
-      });
-    } catch { /* ignore if API fails, localStorage still works */ }
-    localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
-    addNotification({
-      type: 'system',
-      title: lang === 'tr' ? `${trainer.name} ile bağlantı kuruldu!` : `Connected with ${trainer.name}!`,
-      body: lang === 'tr' ? 'Antrenörünüz sizin için program oluşturabilir ve sizi takip edebilir.' : 'Your trainer can now create programs and track your progress.',
-    });
-    navigate('/dashboard');
-  };
-
   const handleConnectByCode = async () => {
     setCodeError('');
     const code = inviteCode.trim().toUpperCase();
-    // First try to connect via API
+    if (!code) { setCodeError(lang === 'tr' ? 'Lütfen bir kod girin.' : 'Please enter a code.'); return; }
     try {
       const res = await fetch('/api/trainer/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('fittrack_token')}` },
         body: JSON.stringify({ inviteCode: code }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const trainer = data.trainer;
-        localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
-        addNotification({
-          type: 'system',
-          title: lang === 'tr' ? `${trainer.name} ile bağlantı kuruldu!` : `Connected with ${trainer.name}!`,
-          body: lang === 'tr' ? 'Antrenörünüz sizin için program oluşturabilir ve sizi takip edebilir.' : 'Your trainer can now create programs and track your progress.',
-        });
-        navigate('/dashboard');
-        return;
-      }
-    } catch { /* fall through to mock */ }
-    // Fallback to mock trainers
-    const found = mockTrainers.find(tr => tr.code === code);
-    if (!found) {
-      setCodeError(lang === 'tr' ? 'Geçersiz davet kodu' : 'Invalid invite code');
-      return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'error');
+      const trainer = {
+        ...data.trainer,
+        avatar: `https://picsum.photos/seed/${data.trainer.username}/100/100`,
+      };
+      localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
+      addNotification({
+        type: 'system',
+        title: lang === 'tr' ? `${trainer.name} ile bağlantı kuruldu!` : `Connected with ${trainer.name}!`,
+        body: lang === 'tr' ? 'Antrenörünüz sizin için program oluşturabilir ve sizi takip edebilir.' : 'Your trainer can now create programs and track your progress.',
+      });
+      navigate('/dashboard');
+    } catch {
+      setCodeError(lang === 'tr' ? 'Geçersiz davet kodu. Lütfen tekrar deneyin.' : 'Invalid invite code. Please try again.');
     }
-    handleSelectTrainer(found);
   };
 
   if (step === 2) {
@@ -147,58 +121,33 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
 
           {/* Invite Code Section */}
           <div className="w-full mb-4 bg-white dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-2xl p-4">
-            <p className="text-[10px] font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-3">
+            <p className="text-[10px] font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-1">
               {lang === 'tr' ? 'Davet Kodu ile Bağlan' : 'Connect with Invite Code'}
+            </p>
+            <p className="text-slate-400 dark:text-white/30 text-xs mb-3">
+              {lang === 'tr' ? 'Antrenörünüzden aldığınız kodu girin.' : 'Enter the code you received from your trainer.'}
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={inviteCode}
-                onChange={e => { setInviteCode(e.target.value); setCodeError(''); }}
-                placeholder={lang === 'tr' ? 'Davet kodunu girin' : 'Enter invite code'}
-                className="flex-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:border-primary"
+                onChange={e => { setInviteCode(e.target.value.toUpperCase()); setCodeError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleConnectByCode()}
+                placeholder={lang === 'tr' ? 'Örn: ERNBNGL2026' : 'e.g. ERNBNGL2026'}
+                className="flex-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 text-sm focus:outline-none focus:border-primary font-mono tracking-widest uppercase"
               />
               <button
                 onClick={handleConnectByCode}
-                className="px-4 py-3 bg-primary text-white font-bold text-sm rounded-xl hover:bg-primary/90 active:scale-95 transition-all"
+                disabled={!inviteCode.trim()}
+                className="px-4 py-3 bg-primary text-white font-bold text-sm rounded-xl hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5"
               >
+                <span className="material-symbols-outlined text-lg">link</span>
                 {lang === 'tr' ? 'Bağlan' : 'Connect'}
               </button>
             </div>
             {codeError && (
               <p className="text-red-500 text-xs mt-2 font-semibold">{codeError}</p>
             )}
-          </div>
-
-          {/* Trainer List */}
-          <div className="w-full mb-4">
-            <p className="text-[10px] font-black text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 px-1">
-              {lang === 'tr' ? 'Antrenör Listesi' : 'Trainer List'}
-            </p>
-            <div className="flex flex-col gap-3">
-              {mockTrainers.map(trainer => (
-                <div
-                  key={trainer.id}
-                  className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-2xl p-4 flex items-center gap-3"
-                >
-                  <img src={trainer.avatar} alt={trainer.name} className="size-12 rounded-full object-cover border-2 border-primary/20" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-slate-900 dark:text-white font-bold text-sm">{trainer.name}</p>
-                    <p className="text-slate-500 dark:text-white/40 text-xs">{trainer.specialty}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] text-yellow-500 font-bold">★ {trainer.rating}</span>
-                      <span className="text-[10px] text-slate-400 dark:text-white/30">{trainer.students} {lang === 'tr' ? 'öğrenci' : 'students'}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleSelectTrainer(trainer)}
-                    className="px-3 py-2 bg-primary/10 border border-primary/30 text-primary font-bold text-xs rounded-xl hover:bg-primary/20 active:scale-95 transition-all"
-                  >
-                    {lang === 'tr' ? 'Seç' : 'Select'}
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Skip Button */}
