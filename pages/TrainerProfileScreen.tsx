@@ -3,11 +3,6 @@ import React, { useState, useRef } from 'react';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
-const mockTrainers = [
-  { id: 0, name: 'Coach Mike', specialty: 'Strength & Conditioning', avatar: 'https://picsum.photos/seed/mike/100/100', code: 'MIKE2026', rating: 4.9, students: 24, years: 8 },
-  { id: 1, name: 'Coach Sara', specialty: 'Fat Loss & Cardio', avatar: 'https://picsum.photos/seed/sara/100/100', code: 'SARA2026', rating: 4.8, students: 18, years: 5 },
-  { id: 2, name: 'Coach Ahmet', specialty: 'Powerlifting', avatar: 'https://picsum.photos/seed/ahmet/100/100', code: 'AHMET2026', rating: 4.7, students: 31, years: 12 },
-];
 
 interface TrainerProfileScreenProps {
   lang: 'tr' | 'en';
@@ -25,42 +20,45 @@ type ModalType = 'personalInfo' | 'password' | 'notifications' | 'help' | 'setti
    ConnectTrainerSection – shown on student profile
    when no trainer is connected yet
 ────────────────────────────────────────────────── */
+interface ConnectedTrainer { id: number; name: string; username: string; code: string; avatar?: string; }
+
 const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [connected, setConnected] = useState<typeof mockTrainers[0] | null>(() => {
+  const [connected, setConnected] = useState<ConnectedTrainer | null>(() => {
     try { return JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null'); } catch { return null; }
   });
 
-  const handleConnect = async (trainer?: typeof mockTrainers[0]) => {
-    const code = trainer ? trainer.code : inviteCode.trim().toUpperCase();
+  const handleConnect = async () => {
+    const code = inviteCode.trim().toUpperCase();
     if (!code) { setError(lang === 'tr' ? 'Lütfen bir kod girin.' : 'Please enter a code.'); return; }
     setLoading(true); setError('');
-
-    // Find in mock list first
-    const found = mockTrainers.find(t => t.code === code) || trainer;
-    if (!found) {
-      setError(lang === 'tr' ? 'Geçersiz kod. Lütfen tekrar deneyin.' : 'Invalid code. Please try again.');
-      setLoading(false);
-      return;
-    }
-
-    // Try real API (best-effort — don't block on failure)
     try {
       const token = localStorage.getItem('fittrack_token');
-      if (token) {
-        await fetch('/api/trainer/connect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ inviteCode: code }),
-        });
+      if (!token) throw new Error('no_token');
+      const res = await fetch('/api/trainer/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ inviteCode: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'error');
+      const trainer: ConnectedTrainer = {
+        ...data.trainer,
+        avatar: `https://picsum.photos/seed/${data.trainer.username}/100/100`,
+      };
+      localStorage.setItem('fittrack_connected_trainer', JSON.stringify(trainer));
+      setConnected(trainer);
+    } catch (e: any) {
+      if (e.message === 'no_token') {
+        setError(lang === 'tr' ? 'Giriş yapmanız gerekiyor.' : 'You need to be logged in.');
+      } else if (e.message === 'error_trainer_not_found') {
+        setError(lang === 'tr' ? 'Antrenör bulunamadı. Kodu kontrol edin.' : 'Trainer not found. Check the code.');
+      } else {
+        setError(lang === 'tr' ? 'Geçersiz kod. Lütfen tekrar deneyin.' : 'Invalid code. Please try again.');
       }
-    } catch { /* ignore network errors */ }
-
-    localStorage.setItem('fittrack_connected_trainer', JSON.stringify(found));
-    setConnected(found);
-    setLoading(false);
+    } finally { setLoading(false); }
   };
 
   if (connected) {
@@ -70,14 +68,19 @@ const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
           {lang === 'tr' ? 'Antrenörüm' : 'My Trainer'}
         </p>
         <div className="flex items-center gap-3">
-          <img src={connected.avatar} alt={connected.name} className="size-10 rounded-full object-cover border-2 border-primary/30" />
+          <img
+            src={connected.avatar || `https://picsum.photos/seed/${connected.username}/100/100`}
+            alt={connected.name}
+            className="size-10 rounded-full object-cover border-2 border-primary/30"
+          />
           <div>
             <p className="text-white font-bold text-sm">{connected.name}</p>
-            <p className="text-white/40 text-xs">{connected.specialty}</p>
+            <p className="text-white/40 text-xs font-mono">@{connected.username}</p>
           </div>
           <button
             onClick={() => { localStorage.removeItem('fittrack_connected_trainer'); setConnected(null); }}
             className="ml-auto text-white/30 hover:text-red-400 transition-colors"
+            title={lang === 'tr' ? 'Bağlantıyı kes' : 'Disconnect'}
           >
             <span className="material-symbols-outlined text-lg">link_off</span>
           </button>
@@ -88,7 +91,6 @@ const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
 
   return (
     <div className="mb-4">
-      {/* Header */}
       <div className="flex items-center gap-2 mb-3 px-1">
         <span className="material-symbols-outlined text-primary text-lg">person_search</span>
         <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
@@ -96,58 +98,34 @@ const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
         </p>
       </div>
 
-      {/* Trainer list */}
-      <div className="flex flex-col gap-2 mb-3">
-        {mockTrainers.map(tr => (
-          <div key={tr.id} className="flex items-center gap-3 bg-card-dark border border-white/5 rounded-2xl px-4 py-3">
-            <img src={tr.avatar} alt={tr.name} className="size-10 rounded-full object-cover border-2 border-white/10 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-sm">{tr.name}</p>
-              <p className="text-white/40 text-xs">{tr.specialty}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-yellow-400 font-bold">★ {tr.rating}</span>
-                <span className="text-[10px] text-white/30">• {tr.students} {lang === 'tr' ? 'öğrenci' : 'students'}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => handleConnect(tr)}
-              disabled={loading}
-              className="flex-shrink-0 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {lang === 'tr' ? 'Seç' : 'Select'}
-            </button>
-          </div>
-        ))}
+      <div className="bg-card-dark border border-white/5 rounded-2xl p-4">
+        <p className="text-white/50 text-xs mb-3 leading-relaxed">
+          {lang === 'tr'
+            ? 'Antrenörünüzden aldığınız davet kodunu girin.'
+            : 'Enter the invite code you received from your trainer.'}
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={e => { setInviteCode(e.target.value.toUpperCase()); setError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleConnect()}
+            placeholder={lang === 'tr' ? 'Örn: ERNBNGL2026' : 'e.g. ERNBNGL2026'}
+            className="flex-1 bg-background-dark border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm outline-none focus:border-primary/50 transition-colors font-mono tracking-widest uppercase"
+          />
+          <button
+            onClick={handleConnect}
+            disabled={loading || !inviteCode.trim()}
+            className="px-4 py-3 bg-primary text-white rounded-xl font-black text-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {loading
+              ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+              : <><span className="material-symbols-outlined text-lg">link</span><span>{lang === 'tr' ? 'Bağlan' : 'Connect'}</span></>
+            }
+          </button>
+        </div>
+        {error && <p className="text-red-400 text-xs font-semibold mt-2">{error}</p>}
       </div>
-
-      {/* Divider */}
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex-1 h-px bg-white/10" />
-        <span className="text-[10px] text-white/30 font-bold uppercase">{lang === 'tr' ? 'veya kod ile' : 'or with code'}</span>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
-
-      {/* Code input */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={inviteCode}
-          onChange={e => { setInviteCode(e.target.value.toUpperCase()); setError(''); }}
-          placeholder={lang === 'tr' ? 'Davet kodu girin...' : 'Enter invite code...'}
-          className="flex-1 bg-card-dark border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm outline-none focus:border-primary/50 transition-colors font-mono tracking-widest"
-        />
-        <button
-          onClick={() => handleConnect()}
-          disabled={loading || !inviteCode.trim()}
-          className="px-4 py-3 bg-primary text-white rounded-xl font-black text-sm hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40"
-        >
-          {loading
-            ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
-            : <span className="material-symbols-outlined text-lg">link</span>
-          }
-        </button>
-      </div>
-      {error && <p className="text-red-400 text-xs font-semibold mt-2 px-1">{error}</p>}
     </div>
   );
 };
