@@ -73,6 +73,12 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
 
   // 3-dot menu in chat
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const [showTrainerProfileModal, setShowTrainerProfileModal] = useState(false);
+
+  // Connected trainer info (for student view)
+  const connectedTrainer = (() => {
+    try { return JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null'); } catch { return null; }
+  })();
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
@@ -255,7 +261,14 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
                 <div className="fixed inset-0 z-10" onClick={() => setShowChatMenu(false)}></div>
                 <div className="absolute top-11 right-0 w-52 bg-card-dark border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden">
                   <button
-                    onClick={() => { setShowChatMenu(false); navigate(`/students?id=${contact.id}`); }}
+                    onClick={() => {
+                      setShowChatMenu(false);
+                      if (role === 'student') {
+                        setShowTrainerProfileModal(true);
+                      } else {
+                        navigate(`/students?id=${contact.id}`);
+                      }
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white/80 hover:bg-white/5 transition-colors"
                   >
                     <span className="material-symbols-outlined text-base text-white/40">person</span>
@@ -435,6 +448,63 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
         </div>
 
         <BottomNav role={role} lang={lang} />
+
+        {/* ── Trainer Profile Modal (student only) ── */}
+        {showTrainerProfileModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowTrainerProfileModal(false)}>
+            <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl pb-10 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/5">
+                <h2 className="text-white font-black text-lg">{lang === 'tr' ? 'Antrenör Profili' : 'Trainer Profile'}</h2>
+                <button onClick={() => setShowTrainerProfileModal(false)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+              <div className="px-6 pt-5 pb-2 flex flex-col items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={connectedTrainer?.avatar || contact.avatar}
+                    alt={connectedTrainer?.name || contact.name}
+                    className="size-20 rounded-2xl object-cover border-2 border-primary/40"
+                  />
+                  <div className="absolute -bottom-1 -right-1 size-5 bg-green-400 rounded-full border-2 border-[#0f1923]"></div>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-white font-black text-xl">{connectedTrainer?.name || contact.name}</h3>
+                  {connectedTrainer?.specialty && (
+                    <p className="text-primary text-xs font-bold mt-1">{connectedTrainer.specialty}</p>
+                  )}
+                </div>
+                <div className="w-full grid grid-cols-3 gap-3 mt-1">
+                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
+                    <p className="text-white font-black text-lg">{connectedTrainer?.rating || '4.9'}</p>
+                    <p className="text-white/40 text-[10px] uppercase font-bold mt-0.5">⭐ {lang === 'tr' ? 'Puan' : 'Rating'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
+                    <p className="text-white font-black text-lg">{connectedTrainer?.students || '12'}</p>
+                    <p className="text-white/40 text-[10px] uppercase font-bold mt-0.5">{lang === 'tr' ? 'Öğrenci' : 'Students'}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
+                    <p className="text-white font-black text-lg">5+</p>
+                    <p className="text-white/40 text-[10px] uppercase font-bold mt-0.5">{lang === 'tr' ? 'Yıl' : 'Years'}</p>
+                  </div>
+                </div>
+                {connectedTrainer?.code && (
+                  <div className="w-full bg-primary/10 border border-primary/20 rounded-xl px-4 py-3">
+                    <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest mb-1">{lang === 'tr' ? 'Davet Kodu' : 'Invite Code'}</p>
+                    <p className="text-white font-black tracking-widest">{connectedTrainer.code}</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowTrainerProfileModal(false)}
+                  className="w-full bg-primary text-white font-black py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all mt-2"
+                >
+                  <span className="material-symbols-outlined text-xl">chat</span>
+                  {lang === 'tr' ? 'Mesaj Gönder' : 'Send Message'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
