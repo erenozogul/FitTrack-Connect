@@ -86,6 +86,18 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          type VARCHAR(20) DEFAULT 'text',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          read_at TIMESTAMP
+        )
+      `;
     }).then(() => console.log("Database tables verified"))
      .catch(err => console.error("Failed to initialize database tables:", err));
   }
@@ -492,6 +504,149 @@ app.post("/api/auth/change-password", authenticateToken, async (req: any, res: a
     await sql`UPDATE users SET password_hash = ${hash} WHERE id = ${req.user.userId}`;
     res.json({ message: "ok" });
   } catch (error) {
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// POST /api/messages - send a message
+app.post("/api/messages", authenticateToken, async (req: any, res: any) => {
+  try {
+    const { receiverId, content, type = 'text' } = req.body;
+    if (!receiverId || !content) return res.status(400).json({ error: "error_missing_fields" });
+    const sql = getDb();
+    const result = await sql`
+      INSERT INTO messages (sender_id, receiver_id, content, type)
+      VALUES (${req.user.userId}, ${receiverId}, ${content}, ${type})
+      RETURNING id, sender_id, receiver_id, content, type, created_at
+    `;
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error("Send message error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// GET /api/messages/:contactId - get messages between current user and contact
+app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const contactId = parseInt(req.params.contactId);
+    const userId = req.user.userId;
+    const rows = await sql`
+      SELECT id, sender_id, receiver_id, content, type, created_at, read_at
+      FROM messages
+      WHERE (sender_id = ${userId} AND receiver_id = ${contactId})
+         OR (sender_id = ${contactId} AND receiver_id = ${userId})
+      ORDER BY created_at ASC
+    `;
+    // Mark received messages as read
+    await sql`
+      UPDATE messages SET read_at = NOW()
+      WHERE sender_id = ${contactId} AND receiver_id = ${userId} AND read_at IS NULL
+    `;
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      from: r.sender_id === userId ? 'me' : 'them',
+      text: r.content,
+      type: r.type,
+      time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: r.created_at,
+    })));
+  } catch (error) {
+    console.error("Get messages error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// GET /api/conversations - get all conversations with last message and unread count
+app.get("/api/conversations", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const userId = req.user.userId;
+    const rows = await sql`
+      SELECT
+        u.id as contact_id,
+        u.first_name || ' ' || u.last_name as contact_name,
+        u.username as contact_username,
+        (
+          SELECT content FROM messages
+          WHERE (sender_id = ${userId} AND receiver_id = u.id)
+             OR (sender_id = u.id AND receiver_id = ${userId})
+          ORDER BY created_at DESC LIMIT 1
+        ) as last_message,
+        (
+          SELECT created_at FROM messages
+          WHERE (sender_id = ${userId} AND receiver_id = u.id)
+             OR (sender_id = u.id AND receiver_id = ${userId})
+          ORDER BY created_at DESC LIMIT 1
+        ) as last_message_time,
+        (
+          SELECT COUNT(*) FROM messages
+          WHERE sender_id = u.id AND receiver_id = ${userId} AND read_at IS NULL
+        ) as unread_count
+      FROM users u
+      WHERE u.id IN (
+        SELECT CASE WHEN sender_id = ${userId} THEN receiver_id ELSE sender_id END
+        FROM messages
+        WHERE sender_id = ${userId} OR receiver_id = ${userId}
+      )
+      ORDER BY last_message_time DESC NULLS LAST
+    `;
+    res.json(rows.map((r: any) => ({
+      id: r.contact_id,
+      name: r.contact_name,
+      username: r.contact_username,
+      avatar: `https://picsum.photos/seed/${r.contact_username}/100/100`,
+      lastMsg: r.last_message || '',
+      time: r.last_message_time ? new Date(r.last_message_time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '',
+      unread: parseInt(r.unread_count) || 0,
+      online: false,
+    })));
+  } catch (error) {
+    console.error("Get conversations error:", error);
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// GET /api/trainer/analytics - trainer stats
+app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== 'trainer') return res.status(403).json({ error: "error_forbidden" });
+    const sql = getDb();
+    const trainerId = req.user.userId;
+
+    const [studentRows, weekRows, monthRows, studentStats] = await Promise.all([
+      sql`SELECT COUNT(*) as total FROM trainer_student WHERE trainer_id = ${trainerId}`,
+      sql`SELECT COUNT(*) as total FROM assignments WHERE trainer_id = ${trainerId} AND assigned_date >= CURRENT_DATE - INTERVAL '7 days'`,
+      sql`SELECT COUNT(*) as total FROM assignments WHERE trainer_id = ${trainerId} AND assigned_date >= CURRENT_DATE - INTERVAL '30 days'`,
+      sql`
+        SELECT u.id, u.first_name || ' ' || u.last_name as name, u.username,
+          COUNT(a.id) as total_assignments,
+          MAX(a.assigned_date) as last_assignment
+        FROM trainer_student ts
+        JOIN users u ON u.id = ts.student_id
+        LEFT JOIN assignments a ON a.student_id = u.id AND a.trainer_id = ${trainerId}
+        WHERE ts.trainer_id = ${trainerId}
+        GROUP BY u.id, u.first_name, u.last_name, u.username
+        ORDER BY total_assignments DESC
+      `,
+    ]);
+
+    res.json({
+      totalStudents: parseInt(studentRows[0].total) || 0,
+      assignmentsThisWeek: parseInt(weekRows[0].total) || 0,
+      assignmentsThisMonth: parseInt(monthRows[0].total) || 0,
+      students: studentStats.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        username: s.username,
+        avatar: `https://picsum.photos/seed/${s.username}/100/100`,
+        totalAssignments: parseInt(s.total_assignments) || 0,
+        lastAssignment: s.last_assignment,
+      })),
+    });
+  } catch (error) {
+    console.error("Analytics error:", error);
     res.status(500).json({ error: "error_internal" });
   }
 });
