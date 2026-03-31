@@ -12,13 +12,6 @@ interface StudentDashboardProps {
   userName?: string;
 }
 
-const mockStudents = [
-  { id: 1, name: "Ayşe Kaya",      avatar: "https://picsum.photos/seed/ayse/100/100",    plan: "Fat Loss",    progress: 68 },
-  { id: 2, name: "Mehmet Yılmaz",  avatar: "https://picsum.photos/seed/mehmet/100/100",  plan: "Muscle Gain", progress: 45 },
-  { id: 3, name: "Zeynep Şahin",   avatar: "https://picsum.photos/seed/zeynep/100/100",  plan: "Strength",    progress: 82 },
-  { id: 4, name: "Can Öztürk",     avatar: "https://picsum.photos/seed/can/100/100",     plan: "Mobility",    progress: 31 },
-  { id: 5, name: "Selin Arslan",   avatar: "https://picsum.photos/seed/selin/100/100",   plan: "Fat Loss",    progress: 57 },
-];
 
 type DayType = 'workout' | 'cardio' | 'off';
 interface DaySchedule {
@@ -96,9 +89,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [notificationsList, setNotificationsList] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
-  const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [trainerStats, setTrainerStats] = useState<{ totalStudents: number; avgSessions: number } | null>(null);
 
   useEffect(() => {
     setNotificationsList(getNotifications());
@@ -121,6 +114,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     const interval = setInterval(fetchUnreadMsgs, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (role !== 'trainer') return;
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    fetch('/api/trainer/analytics', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        const total = data.totalStudents || 0;
+        const totalSessions = data.students?.reduce((s: number, st: any) => s + (st.totalAssignments || 0), 0) || 0;
+        const avg = total > 0 ? Math.round(totalSessions / total) : 0;
+        setTrainerStats({ totalStudents: total, avgSessions: avg });
+      })
+      .catch(() => {});
+  }, [role]);
 
   useEffect(() => {
     const token = localStorage.getItem('fittrack_token');
@@ -188,8 +197,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   };
 
   const isTrainer = role === 'trainer';
-  const displayUserName = userName || (isTrainer ? "Coach Mike" : "Alex Rivera");
-  const selectedStudent = mockStudents.find(s => s.id === selectedStudentId) || mockStudents[0];
+  const displayUserName = userName || (isTrainer ? "Antrenör" : "Öğrenci");
 
   const handleDayClick = (dayNum: number) => {
     setSelectedDay(dayNum);
@@ -202,11 +210,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     avatar: realAvatar,
     roleLabel: t.trainer,
     metrics: [
-      { label: t.activeStudents, value: String(mockStudents.length), unit: "" },
-      { label: lang === 'tr' ? 'İlerleme' : 'Progress', value: String(selectedStudent.progress), unit: "%" }
+      { label: t.activeStudents, value: trainerStats ? String(trainerStats.totalStudents) : '—', unit: "" },
+      { label: lang === 'tr' ? 'Ort. Seans' : 'Avg. Sessions', value: trainerStats ? String(trainerStats.avgSessions) : '—', unit: "" }
     ],
     heroTitle: t.coachingOverview,
-    heroSub: selectedStudent.name
+    heroSub: ''
   } : {
     name: displayUserName,
     email: realEmail,

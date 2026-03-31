@@ -104,18 +104,28 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
   // ─── Load messages for selected contact ──────────────
-  const loadMessages = useCallback(async (contactId: number) => {
-    setLoadingMsgs(true);
+  const loadMessages = useCallback(async (contactId: number, silent = false) => {
+    if (!silent) setLoadingMsgs(true);
     try {
       const res = await fetch(`/api/messages/${contactId}`, { headers: apiHeaders() });
-      if (res.ok) { setMessages(await res.json()); }
-    } catch { /* ignore */ } finally { setLoadingMsgs(false); }
+      if (res.ok) {
+        const newMsgs = await res.json();
+        setMessages(prev => {
+          if (prev.length !== newMsgs.length) return newMsgs;
+          if (prev.length === 0) return newMsgs;
+          const lastPrev = prev[prev.length - 1];
+          const lastNew = newMsgs[newMsgs.length - 1];
+          if (lastPrev?.id !== lastNew?.id) return newMsgs;
+          return prev; // no change, skip re-render
+        });
+      }
+    } catch { /* ignore */ } finally { if (!silent) setLoadingMsgs(false); }
   }, []);
 
   // ─── Poll for new messages every 3s ──────────────────
   useEffect(() => {
     if (!selectedContact) { if (pollRef.current) clearInterval(pollRef.current); return; }
-    pollRef.current = setInterval(() => loadMessages(selectedContact.id), 3000);
+    pollRef.current = setInterval(() => loadMessages(selectedContact.id, true), 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [selectedContact, loadMessages]);
 
@@ -178,10 +188,6 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
       title: lang === 'tr' ? `${selectedContact.name}'a mesaj gönderildi` : `Message sent to ${selectedContact.name}`,
       body: trimmed.slice(0, 80),
     });
-
-    // Simulate typing indicator
-    setIsTyping(true);
-    setTimeout(() => setIsTyping(false), 2000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

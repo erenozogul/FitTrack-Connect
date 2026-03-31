@@ -918,12 +918,16 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const [assignStudentId, setAssignStudentId] = useState<number>(0);
   const [assignDate, setAssignDate] = useState<string>(() => {
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   });
   const [assignStartTime, setAssignStartTime] = useState<string>('09:00');
   const [assignEndTime, setAssignEndTime] = useState<string>('10:00');
   const [assignStudentDropdown, setAssignStudentDropdown] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
   const [realStudents, setRealStudents] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
@@ -941,8 +945,8 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const handleAssign = async () => {
     const student = realStudents.find(s => s.id === assignStudentId);
     if (!student || !assignTarget) return;
+    setAssignError(null);
     try {
-      // Save to DB
       await api.post('/api/assignments', {
         studentId: student.id,
         studentName: student.name,
@@ -952,20 +956,21 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
         startTime: assignStartTime,
         endTime: assignEndTime,
       });
-      // Also keep localStorage in sync for dashboard
-      const existing = JSON.parse(localStorage.getItem('fittrack_assignments') || '{}');
-      const key = assignDate;
-      const newEntry = { studentId: student.id, studentName: student.name, workoutId: assignTarget.id, workoutName: assignTarget.name[lang], startTime: assignStartTime, endTime: assignEndTime };
-      existing[key] = [...(existing[key] || []), newEntry];
-      localStorage.setItem('fittrack_assignments', JSON.stringify(existing));
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      if (err?.error === 'error_time_conflict') {
+        setAssignError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
+      } else {
+        setAssignError(lang === 'tr' ? 'Bir hata oluştu.' : 'An error occurred.');
+      }
+      return;
+    }
     addNotification({
       type: 'assignment',
       title: lang === 'tr' ? 'Yeni Antrenman Atandı' : 'New Workout Assigned',
       body: `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
     });
     setAssignSuccess(true);
-    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); }, 1200);
+    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); setAssignError(null); }, 1200);
   };
 
   const handleLogoutClick = () => { onLogout(); window.location.hash = '#/'; };
@@ -1274,6 +1279,13 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                     </div>
                   </div>
                 </div>
+
+                {assignError && (
+                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+                    <span className="material-symbols-outlined text-red-400 text-base">error</span>
+                    <p className="text-red-400 text-sm font-semibold">{assignError}</p>
+                  </div>
+                )}
 
                 <button
                   onClick={handleAssign}
