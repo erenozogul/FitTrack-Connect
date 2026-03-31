@@ -123,7 +123,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
       localStorage.setItem('fittrack_user', JSON.stringify(data.user));
 
       onLogin(`${data.user.firstName} ${data.user.lastName}`, data.user.role);
-      navigate(data.user.role === 'trainer' ? '/library' : '/dashboard');
+      navigate('/dashboard');
     } catch {
       setError(t.error_generic);
     } finally {
