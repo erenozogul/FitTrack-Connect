@@ -98,10 +98,28 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
 
   useEffect(() => {
     setNotificationsList(getNotifications());
     setUnreadCount(getUnreadCount());
+  }, []);
+
+  useEffect(() => {
+    const fetchUnreadMsgs = () => {
+      const token = localStorage.getItem('fittrack_token');
+      if (!token) return;
+      fetch('/api/conversations', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : [])
+        .then((convs: any[]) => {
+          const count = convs.filter(c => c.unread > 0).length;
+          setUnreadMsgCount(count);
+        })
+        .catch(() => {});
+    };
+    fetchUnreadMsgs();
+    const interval = setInterval(fetchUnreadMsgs, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -266,10 +284,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         <div className="flex items-center gap-2">
           {/* Chat button */}
           <button
-            onClick={() => navigate('/messages')}
+            onClick={() => { setUnreadMsgCount(0); navigate('/messages'); }}
             className="relative p-2 rounded-full bg-white/5 text-white hover:bg-white/10 transition-colors"
           >
             <span className="material-symbols-outlined">chat_bubble</span>
+            {unreadMsgCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-black leading-none">
+                {unreadMsgCount > 9 ? '9+' : unreadMsgCount}
+              </span>
+            )}
           </button>
 
         <div className="relative">
