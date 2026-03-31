@@ -512,6 +512,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               </div>
             ))}
           </div>
+          {isTrainer && (
+            <button
+              onClick={() => navigate('/analytics')}
+              className="w-full flex items-center justify-between bg-card-dark border border-white/5 rounded-xl px-4 py-3.5 hover:border-primary/30 transition-colors active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-xl">bar_chart</span>
+                <span className="text-white text-sm font-bold">{lang === 'tr' ? 'Analitik Paneli Görüntüle' : 'View Analytics Panel'}</span>
+              </div>
+              <span className="material-symbols-outlined text-white/20">chevron_right</span>
+            </button>
+          )}
         </section>
       </main>
 
