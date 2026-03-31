@@ -385,6 +385,21 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
     const { studentId, studentName, workoutId, workoutName, assignedDate, startTime, endTime } = req.body;
     if (!studentId || !workoutName || !assignedDate) return res.status(400).json({ error: "error_missing_fields" });
     const sql = getDb();
+
+    // Check for overlapping time slot for the same student on the same date
+    if (startTime && endTime) {
+      const conflicts = await sql`
+        SELECT id FROM assignments
+        WHERE student_id = ${studentId}
+          AND assigned_date = ${assignedDate}
+          AND start_time < ${endTime}
+          AND end_time > ${startTime}
+      `;
+      if (conflicts.length > 0) {
+        return res.status(409).json({ error: "error_time_conflict" });
+      }
+    }
+
     const result = await sql`
       INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time)
       VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}, ${startTime || null}, ${endTime || null})
