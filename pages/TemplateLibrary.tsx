@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
@@ -915,7 +915,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
 
   const isTrainer = role === 'trainer';
   const [assignTarget, setAssignTarget] = useState<BodyPart | null>(null);
-  const [assignStudentId, setAssignStudentId] = useState<number>(1);
+  const [assignStudentId, setAssignStudentId] = useState<number>(0);
   const [assignDate, setAssignDate] = useState<string>(() => {
     const d = new Date();
     return d.toISOString().split('T')[0];
@@ -924,17 +924,22 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const [assignEndTime, setAssignEndTime] = useState<string>('10:00');
   const [assignStudentDropdown, setAssignStudentDropdown] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [realStudents, setRealStudents] = useState<{ id: number; name: string }[]>([]);
 
-  const mockStudents = [
-    { id: 1, name: 'Ayşe Kaya' },
-    { id: 2, name: 'Mehmet Yılmaz' },
-    { id: 3, name: 'Zeynep Şahin' },
-    { id: 4, name: 'Can Öztürk' },
-    { id: 5, name: 'Selin Arslan' },
-  ];
+  useEffect(() => {
+    if (!isTrainer) return;
+    const token = localStorage.getItem('fittrack_token');
+    fetch('/api/trainer/students', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: { id: number; name: string }[]) => {
+        setRealStudents(data);
+        if (data.length > 0) setAssignStudentId(data[0].id);
+      })
+      .catch(() => {});
+  }, [isTrainer]);
 
   const handleAssign = async () => {
-    const student = mockStudents.find(s => s.id === assignStudentId);
+    const student = realStudents.find(s => s.id === assignStudentId);
     if (!student || !assignTarget) return;
     try {
       // Save to DB
@@ -1214,12 +1219,12 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                     onClick={() => setAssignStudentDropdown(v => !v)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm flex items-center justify-between"
                   >
-                    <span>{mockStudents.find(s => s.id === assignStudentId)?.name}</span>
+                    <span>{realStudents.find(s => s.id === assignStudentId)?.name ?? (realStudents.length === 0 ? (lang === 'tr' ? 'Öğrenci yok' : 'No students') : '...')}</span>
                     <span className="material-symbols-outlined text-white/50 text-base">{assignStudentDropdown ? 'expand_less' : 'expand_more'}</span>
                   </button>
                   {assignStudentDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl">
-                      {mockStudents.map(s => (
+                      {realStudents.map(s => (
                         <button
                           key={s.id}
                           type="button"
