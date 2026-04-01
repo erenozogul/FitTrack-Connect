@@ -88,7 +88,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationsList, setNotificationsList] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
+  const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+  const [selectedDay, setSelectedDay] = useState<string>(todayKey);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [trainerStats, setTrainerStats] = useState<{ totalStudents: number; avgSessions: number } | null>(null);
@@ -181,12 +182,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [editForm, setEditForm] = useState({ title: '', type: 'workout' as DayType, duration: 0, category: '' });
   const [showDayAssignments, setShowDayAssignments] = useState(false);
 
-  const getDayDateKey = (dayNum: number) => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}-${dayNum.toString().padStart(2, '0')}`;
-  };
+  // selectedDay is now a full "YYYY-MM-DD" string — no need for getDayDateKey
+  const getDayDateKey = (dateKey: string) => dateKey;
 
   const t = translations[lang];
 
@@ -198,7 +195,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     duration: 0,
     image: '',
   };
-  const daySchedule = schedule[selectedDay] ?? defaultDaySchedule;
+  const selectedDayNum = new Date(selectedDay + 'T12:00:00').getDate();
+  const daySchedule = schedule[selectedDayNum] ?? defaultDaySchedule;
 
   const handleLogoutClick = () => {
     onLogout();
@@ -208,8 +206,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const isTrainer = role === 'trainer';
   const displayUserName = userName || (isTrainer ? "Antrenör" : "Öğrenci");
 
-  const handleDayClick = (dayNum: number) => {
-    setSelectedDay(dayNum);
+  const handleDayClick = (dateKey: string) => {
+    setSelectedDay(dateKey);
   };
 
   // Dynamic Content Data
@@ -249,7 +247,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return { label: dayLabels[i], num: d.getDate() };
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return { label: dayLabels[i], num: d.getDate(), dateKey };
   });
 
   const dayDotColor: Record<DayType, string> = {
@@ -383,11 +382,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
           </div>
           <div className="flex justify-between items-center gap-2 overflow-x-auto no-scrollbar py-1">
             {days.map((day) => {
-              const isActive = day.num === selectedDay;
+              const isActive = day.dateKey === selectedDay;
               return (
                 <div
-                  key={day.num}
-                  onClick={() => handleDayClick(day.num)}
+                  key={day.dateKey}
+                  onClick={() => handleDayClick(day.dateKey)}
                   className={`flex flex-col items-center min-w-[48px] py-3 rounded-xl border transition-all cursor-pointer ${
                     isActive
                       ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-105'
@@ -398,7 +397,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   <span className="text-sm font-black">{day.num}</span>
                   {isTrainer ? (
                     (() => {
-                      const count = (assignments[getDayDateKey(day.num)] || []).length;
+                      const count = (assignments[day.dateKey] || []).length;
                       return count > 0 ? (
                         <span className="text-[8px] font-black text-primary mt-0.5">{count}</span>
                       ) : (
@@ -419,7 +418,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
           <section>
             <div className="flex items-center justify-between mb-3 px-1">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                {lang === 'tr' ? `${selectedDay} ${new Date().toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'long' })} – Seanslar` : `${new Date().toLocaleString('en-US', { month: 'long' })} ${selectedDay} – Sessions`}
+                {(() => {
+                  const d = new Date(selectedDay + 'T12:00:00');
+                  const dayNum = d.getDate();
+                  const monthStr = d.toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'long' });
+                  return lang === 'tr' ? `${dayNum} ${monthStr} – Seanslar` : `${monthStr} ${dayNum} – Sessions`;
+                })()}
               </h2>
               <button
                 onClick={() => navigate('/library')}
@@ -430,7 +434,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               </button>
             </div>
             {(() => {
-              const dayAssignments = assignments[getDayDateKey(selectedDay)] || [];
+              const dayAssignments = assignments[selectedDay] || [];
               if (dayAssignments.length === 0) {
                 return (
                   <div className="flex flex-col items-center gap-3 py-8 bg-card-dark rounded-2xl border border-white/5">
@@ -615,11 +619,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black text-white">
-                  {lang === 'tr' ? `${selectedDay} Mart` : `March ${selectedDay}`}
+                  {(() => { const d = new Date(selectedDay + 'T12:00:00'); return d.toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'long' }); })()}
                 </h2>
                 <p className="text-xs text-white/40 mt-0.5">
                   {(() => {
-                    const dayItems = assignments[getDayDateKey(selectedDay)] || [];
+                    const dayItems = assignments[selectedDay] || [];
                     return dayItems.length > 0
                       ? `${dayItems.length} ${lang === 'tr' ? 'seans' : 'session'}`
                       : lang === 'tr' ? 'Seans yok' : 'No sessions';
@@ -632,7 +636,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             </div>
 
             {(() => {
-              const dayItems = assignments[getDayDateKey(selectedDay)] || [];
+              const dayItems = assignments[selectedDay] || [];
               if (dayItems.length === 0) {
                 return (
                   <div className="flex flex-col items-center gap-3 py-6">
