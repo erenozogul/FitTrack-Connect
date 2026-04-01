@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fittrack-dev",
+      "runtimeExecutable": "C:\\Users\\Dell\\AppData\\Roaming\\fnm\\node-versions\\v22.22.2\\installation\\node.exe",
+      "env": {
+        "PATH": "C:\\Users\\Dell\\AppData\\Roaming\\fnm\\node-versions\\v22.22.2\\installation;C:\\Windows\\system32;C:\\Windows"
+      },
+      "runtimeArgs": [
+        "C:\\Users\\Dell\\OneDrive\\Masaüstü\\workspace\\FitTrack-Connect\\.claude\\worktrees\\practical-ellis\\node_modules\\tsx\\dist\\cli.mjs",
+        "watch",
+        "--env-file=C:\\Users\\Dell\\OneDrive\\Masaüstü\\workspace\\FitTrack-Connect\\.claude\\worktrees\\practical-ellis\\.env",
+        "C:\\Users\\Dell\\OneDrive\\Masaüstü\\workspace\\FitTrack-Connect\\.claude\\worktrees\\practical-ellis\\server.ts"
+      ],
+      "port": 3000
+    }
+  ]
+}
