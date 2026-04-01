@@ -100,6 +100,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
+  const [editError, setEditError] = useState('');
+  const closeEditModal = () => { setEditingAssignment(null); setEditError(''); };
 
   const handleDeleteAssignment = async (id: number, dateKey: string) => {
     const token = localStorage.getItem('fittrack_token');
@@ -793,14 +795,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
       )}
       {/* Edit Assignment Modal */}
       {editingAssignment && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4" onClick={() => setEditingAssignment(null)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4" onClick={closeEditModal}>
           <div className="w-full max-w-sm bg-card-dark border border-white/10 rounded-2xl p-6 flex flex-col gap-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black text-white">{lang === 'tr' ? 'Seansı Düzenle' : 'Edit Session'}</h2>
                 <p className="text-xs text-white/40 mt-0.5">{editingAssignment.studentName} · {editingAssignment.workoutName}</p>
               </div>
-              <button onClick={() => setEditingAssignment(null)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+              <button onClick={closeEditModal} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
@@ -816,8 +818,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-primary/50" />
               </div>
             </div>
+            {editError && (
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2.5">
+                <span className="material-symbols-outlined text-red-400 text-base">error</span>
+                <p className="text-red-400 text-xs font-bold">{editError}</p>
+              </div>
+            )}
             <div className="flex gap-3">
-              <button onClick={() => setEditingAssignment(null)}
+              <button onClick={closeEditModal}
                 className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-sm font-bold hover:bg-white/5 transition-colors">
                 {lang === 'tr' ? 'İptal' : 'Cancel'}
               </button>
@@ -825,14 +833,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                 onClick={async () => {
                   const token = localStorage.getItem('fittrack_token');
                   if (!token || !editingAssignment.id) return;
-                  // Check conflict: same student, same date, overlapping time (exclude self)
+                  setEditError('');
+                  // Check conflict locally: same date, overlapping time (exclude self)
                   const dayItems = assignments[editingAssignment.dateKey] || [];
-                  const hasConflict = dayItems.some(a =>
+                  const hasConflict = dayItems.some((a: any) =>
                     a.id !== editingAssignment.id &&
                     a.startTime && a.endTime && editStartTime && editEndTime &&
                     a.startTime < editEndTime && a.endTime > editStartTime
                   );
-                  if (hasConflict) return;
+                  if (hasConflict) {
+                    setEditError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
+                    return;
+                  }
                   // Delete old and re-create with new times (API has no PATCH endpoint)
                   await fetch(`/api/assignments/${editingAssignment.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
                   const res = await fetch('/api/assignments', {
@@ -848,19 +860,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       endTime: editEndTime,
                     }),
                   });
+                  if (res.status === 409) {
+                    setEditError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
+                    return;
+                  }
                   if (res.ok) {
                     const newA = await res.json();
                     setAssignments(prev => {
                       const updated = { ...prev };
                       const dk = editingAssignment.dateKey;
                       updated[dk] = (updated[dk] || [])
-                        .filter(a => a.id !== editingAssignment.id)
-                        .concat([{ id: newA.id ?? newA.id, studentId: editingAssignment.studentId, studentName: editingAssignment.studentName, workoutId: editingAssignment.workoutId, workoutName: editingAssignment.workoutName, startTime: editStartTime, endTime: editEndTime }]);
+                        .filter((a: any) => a.id !== editingAssignment.id)
+                        .concat([{ id: newA.id, studentId: editingAssignment.studentId, studentName: editingAssignment.studentName, workoutId: editingAssignment.workoutId, workoutName: editingAssignment.workoutName, startTime: editStartTime, endTime: editEndTime }]);
                       updated[dk].sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''));
                       return updated;
                     });
+                    closeEditModal();
                   }
-                  setEditingAssignment(null);
                 }}
                 className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-black hover:bg-primary/90 active:scale-95 transition-all">
                 {lang === 'tr' ? 'Kaydet' : 'Save'}
