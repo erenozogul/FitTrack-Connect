@@ -96,6 +96,28 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [assignments, setAssignments] = useState<Record<string, any[]>>(() => {
     try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
   });
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+
+  const handleDeleteAssignment = async (id: number, dateKey: string) => {
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    setDeletingId(id);
+    try {
+      await fetch(`/api/assignments/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      setAssignments(prev => {
+        const updated = { ...prev };
+        if (updated[dateKey]) {
+          updated[dateKey] = updated[dateKey].filter(a => a.id !== id);
+          if (updated[dateKey].length === 0) delete updated[dateKey];
+        }
+        return updated;
+      });
+    } catch {}
+    setDeletingId(null);
+  };
 
   useEffect(() => {
     setNotificationsList(getNotifications());
@@ -156,7 +178,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         data.forEach(a => {
           const key = toLocalDate(String(a.assignedDate));
           if (!grouped[key]) grouped[key] = [];
-          grouped[key].push({ studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime });
+          grouped[key].push({ id: a.id, studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime });
         });
         localStorage.setItem('fittrack_assignments', JSON.stringify(grouped));
         setAssignments(grouped);
@@ -448,7 +470,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               return (
                 <div className="flex flex-col gap-2">
                   {dayAssignments.map((a, idx) => (
-                    <div key={idx} className="flex items-center gap-3 bg-card-dark border border-white/5 rounded-xl px-4 py-3">
+                    <div key={a.id ?? idx} className="flex items-center gap-3 bg-card-dark border border-white/5 rounded-xl px-4 py-3">
                       <img
                         src={`https://picsum.photos/seed/${a.studentName.split(' ')[0].toLowerCase()}/100/100`}
                         alt={a.studentName}
@@ -457,13 +479,30 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-white truncate">{a.studentName}</p>
                         <p className="text-xs text-primary/80 font-semibold mt-0.5 truncate">{a.workoutName}</p>
+                        {(a.startTime || a.endTime) && (
+                          <p className="text-[10px] text-white/50 font-semibold mt-0.5">{a.startTime}{a.endTime ? ` – ${a.endTime}` : ''}</p>
+                        )}
                       </div>
-                      {(a.startTime || a.endTime) && (
-                        <div className="flex-shrink-0 text-right">
-                          <p className="text-xs font-black text-white">{a.startTime}</p>
-                          <p className="text-[10px] text-white/40 font-semibold">{a.endTime}</p>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => { setEditingAssignment({ ...a, dateKey: selectedDay }); setEditStartTime(a.startTime || ''); setEditEndTime(a.endTime || ''); }}
+                          className="size-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-primary/20 text-white/40 hover:text-primary transition-colors"
+                          title={lang === 'tr' ? 'Düzenle' : 'Edit'}
+                        >
+                          <span className="material-symbols-outlined text-sm">edit</span>
+                        </button>
+                        <button
+                          onClick={() => a.id && handleDeleteAssignment(a.id, selectedDay)}
+                          disabled={deletingId === a.id}
+                          className="size-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors disabled:opacity-40"
+                          title={lang === 'tr' ? 'Sil' : 'Delete'}
+                        >
+                          {deletingId === a.id
+                            ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                            : <span className="material-symbols-outlined text-sm">delete</span>
+                          }
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -749,6 +788,84 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               <span className="material-symbols-outlined text-lg">check</span>
               {lang === 'tr' ? 'Kaydet' : 'Save'}
             </button>
+          </div>
+        </div>
+      )}
+      {/* Edit Assignment Modal */}
+      {editingAssignment && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4" onClick={() => setEditingAssignment(null)}>
+          <div className="w-full max-w-sm bg-card-dark border border-white/10 rounded-2xl p-6 flex flex-col gap-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black text-white">{lang === 'tr' ? 'Seansı Düzenle' : 'Edit Session'}</h2>
+                <p className="text-xs text-white/40 mt-0.5">{editingAssignment.studentName} · {editingAssignment.workoutName}</p>
+              </div>
+              <button onClick={() => setEditingAssignment(null)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Başlangıç' : 'Start'}</label>
+                <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)}
+                  className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-primary/50" />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Bitiş' : 'End'}</label>
+                <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)}
+                  className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-primary/50" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setEditingAssignment(null)}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-white/60 text-sm font-bold hover:bg-white/5 transition-colors">
+                {lang === 'tr' ? 'İptal' : 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  const token = localStorage.getItem('fittrack_token');
+                  if (!token || !editingAssignment.id) return;
+                  // Check conflict: same student, same date, overlapping time (exclude self)
+                  const dayItems = assignments[editingAssignment.dateKey] || [];
+                  const hasConflict = dayItems.some(a =>
+                    a.id !== editingAssignment.id &&
+                    a.startTime && a.endTime && editStartTime && editEndTime &&
+                    a.startTime < editEndTime && a.endTime > editStartTime
+                  );
+                  if (hasConflict) return;
+                  // Delete old and re-create with new times (API has no PATCH endpoint)
+                  await fetch(`/api/assignments/${editingAssignment.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                  const res = await fetch('/api/assignments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                      studentId: editingAssignment.studentId,
+                      studentName: editingAssignment.studentName,
+                      workoutId: editingAssignment.workoutId,
+                      workoutName: editingAssignment.workoutName,
+                      assignedDate: editingAssignment.dateKey,
+                      startTime: editStartTime,
+                      endTime: editEndTime,
+                    }),
+                  });
+                  if (res.ok) {
+                    const newA = await res.json();
+                    setAssignments(prev => {
+                      const updated = { ...prev };
+                      const dk = editingAssignment.dateKey;
+                      updated[dk] = (updated[dk] || [])
+                        .filter(a => a.id !== editingAssignment.id)
+                        .concat([{ id: newA.id ?? newA.id, studentId: editingAssignment.studentId, studentName: editingAssignment.studentName, workoutId: editingAssignment.workoutId, workoutName: editingAssignment.workoutName, startTime: editStartTime, endTime: editEndTime }]);
+                      updated[dk].sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''));
+                      return updated;
+                    });
+                  }
+                  setEditingAssignment(null);
+                }}
+                className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-black hover:bg-primary/90 active:scale-95 transition-all">
+                {lang === 'tr' ? 'Kaydet' : 'Save'}
+              </button>
+            </div>
           </div>
         </div>
       )}
