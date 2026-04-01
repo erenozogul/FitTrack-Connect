@@ -379,6 +379,18 @@ app.get("/api/trainer/students", authenticateToken, async (req: any, res: any) =
   }
 });
 
+// Helper: convert Neon DATE (JS Date object, UTC midnight) to "YYYY-MM-DD" using local date parts
+const dateToStr = (d: any): string => {
+  if (!d) return '';
+  if (d instanceof Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return String(d).slice(0, 10);
+};
+
 // POST /api/assignments - trainer creates assignment
 app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
   try {
@@ -391,7 +403,7 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
       const conflicts = await sql`
         SELECT id FROM assignments
         WHERE student_id = ${studentId}
-          AND assigned_date = ${assignedDate}
+          AND assigned_date = ${assignedDate}::date
           AND start_time < ${endTime}
           AND end_time > ${startTime}
       `;
@@ -402,10 +414,20 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
 
     const result = await sql`
       INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time)
-      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}, ${startTime || null}, ${endTime || null})
+      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null})
       RETURNING *
     `;
-    res.status(201).json(result[0]);
+    const row = result[0];
+    res.status(201).json({
+      id: row.id,
+      studentId: row.student_id,
+      studentName: row.student_name,
+      workoutId: row.workout_id,
+      workoutName: row.workout_name,
+      assignedDate: dateToStr(row.assigned_date),
+      startTime: row.start_time,
+      endTime: row.end_time,
+    });
   } catch (error) {
     console.error("Create assignment error:", error);
     res.status(500).json({ error: "error_internal" });
@@ -420,11 +442,11 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
     let rows;
     if (req.user.role === 'trainer') {
       rows = date
-        ? await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} AND assigned_date = ${date} ORDER BY start_time`
+        ? await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
         : await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
     } else {
       rows = date
-        ? await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} AND assigned_date = ${date} ORDER BY start_time`
+        ? await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
         : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
     }
     res.json(rows.map((r: any) => ({
@@ -433,7 +455,7 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       studentName: r.student_name,
       workoutId: r.workout_id,
       workoutName: r.workout_name,
-      assignedDate: r.assigned_date,
+      assignedDate: dateToStr(r.assigned_date),
       startTime: r.start_time,
       endTime: r.end_time,
     })));
