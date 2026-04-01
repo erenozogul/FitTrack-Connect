@@ -92,6 +92,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [trainerStats, setTrainerStats] = useState<{ totalStudents: number; avgSessions: number } | null>(null);
+  const [assignments, setAssignments] = useState<Record<string, any[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
+  });
 
   useEffect(() => {
     setNotificationsList(getNotifications());
@@ -137,15 +140,25 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     fetch('/api/assignments', { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then((data: any[]) => {
-        if (!data.length) return;
-        // Convert flat array to localStorage format grouped by date
+        // Convert flat array to grouped-by-date format
         const grouped: Record<string, any[]> = {};
+        // toLocalDate: convert any date string (UTC ISO or YYYY-MM-DD) to local YYYY-MM-DD
+        const toLocalDate = (d: string): string => {
+          if (!d) return '';
+          const dt = new Date(d);
+          if (isNaN(dt.getTime())) return d.slice(0, 10);
+          const y = dt.getFullYear();
+          const m = String(dt.getMonth() + 1).padStart(2, '0');
+          const day = String(dt.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
         data.forEach(a => {
-          const key = typeof a.assignedDate === 'string' ? a.assignedDate.split('T')[0] : a.assignedDate;
+          const key = toLocalDate(String(a.assignedDate));
           if (!grouped[key]) grouped[key] = [];
           grouped[key].push({ studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime });
         });
         localStorage.setItem('fittrack_assignments', JSON.stringify(grouped));
+        setAssignments(grouped);
       })
       .catch(() => {});
   }, []);
@@ -167,10 +180,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ title: '', type: 'workout' as DayType, duration: 0, category: '' });
   const [showDayAssignments, setShowDayAssignments] = useState(false);
-
-  const loadAssignments = (): Record<string, Array<{ studentId: number; studentName: string; workoutId: string; workoutName: string; startTime?: string; endTime?: string }>> => {
-    try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
-  };
 
   const getDayDateKey = (dayNum: number) => {
     const now = new Date();
@@ -389,7 +398,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                   <span className="text-sm font-black">{day.num}</span>
                   {isTrainer ? (
                     (() => {
-                      const count = (loadAssignments()[getDayDateKey(day.num)] || []).length;
+                      const count = (assignments[getDayDateKey(day.num)] || []).length;
                       return count > 0 ? (
                         <span className="text-[8px] font-black text-primary mt-0.5">{count}</span>
                       ) : (
@@ -421,7 +430,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               </button>
             </div>
             {(() => {
-              const dayAssignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
+              const dayAssignments = assignments[getDayDateKey(selectedDay)] || [];
               if (dayAssignments.length === 0) {
                 return (
                   <div className="flex flex-col items-center gap-3 py-8 bg-card-dark rounded-2xl border border-white/5">
@@ -610,9 +619,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                 </h2>
                 <p className="text-xs text-white/40 mt-0.5">
                   {(() => {
-                    const assignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
-                    return assignments.length > 0
-                      ? `${assignments.length} ${lang === 'tr' ? 'seans' : 'session'}`
+                    const dayItems = assignments[getDayDateKey(selectedDay)] || [];
+                    return dayItems.length > 0
+                      ? `${dayItems.length} ${lang === 'tr' ? 'seans' : 'session'}`
                       : lang === 'tr' ? 'Seans yok' : 'No sessions';
                   })()}
                 </p>
@@ -623,8 +632,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             </div>
 
             {(() => {
-              const assignments = loadAssignments()[getDayDateKey(selectedDay)] || [];
-              if (assignments.length === 0) {
+              const dayItems = assignments[getDayDateKey(selectedDay)] || [];
+              if (dayItems.length === 0) {
                 return (
                   <div className="flex flex-col items-center gap-3 py-6">
                     <div className="size-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -645,7 +654,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               }
               return (
                 <div className="flex flex-col gap-3">
-                  {assignments.map((a, idx) => (
+                  {dayItems.map((a, idx) => (
                     <div key={idx} className="flex items-center gap-3 bg-white/5 rounded-xl p-3.5">
                       <img
                         src={`https://picsum.photos/seed/${a.studentName.split(' ')[0].toLowerCase()}/100/100`}
