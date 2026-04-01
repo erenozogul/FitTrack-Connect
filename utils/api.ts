@@ -7,6 +7,7 @@ const headers = () => ({
   'Authorization': `Bearer ${getToken()}`,
 });
 
+
 export const api = {
   get: async (path: string) => {
     const res = await fetch(`${BASE}${path}`, { headers: headers() });
