@@ -947,6 +947,28 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     if (!student || !assignTarget) return;
     setAssignError(null);
     try {
+      // Client-side conflict check: fetch existing assignments for this student
+      // and verify no time overlap before calling the API
+      if (assignStartTime && assignEndTime) {
+        const existing: any[] = await api.get('/api/assignments');
+        const toLocalDateStr = (d: string) => {
+          const dt = new Date(d);
+          if (isNaN(dt.getTime())) return d.slice(0, 10);
+          return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        };
+        const hasConflict = existing.some(a =>
+          a.studentId === student.id &&
+          toLocalDateStr(String(a.assignedDate)) === assignDate &&
+          a.startTime && a.endTime &&
+          a.startTime < assignEndTime &&
+          a.endTime > assignStartTime
+        );
+        if (hasConflict) {
+          setAssignError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
+          return;
+        }
+      }
+
       await api.post('/api/assignments', {
         studentId: student.id,
         studentName: student.name,
