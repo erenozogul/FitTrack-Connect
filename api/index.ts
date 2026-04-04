@@ -400,11 +400,11 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
     if (!studentId || !workoutName || !assignedDate) return res.status(400).json({ error: "error_missing_fields" });
     const sql = getDb();
 
-    // Check for overlapping time slot for the same student on the same date
+    // Check for overlapping time slot for the same trainer on the same date (any student)
     if (startTime && endTime) {
       const conflicts = await sql`
         SELECT id FROM assignments
-        WHERE student_id = ${studentId}
+        WHERE trainer_id = ${req.user.userId}
           AND assigned_date = ${assignedDate}::date
           AND start_time < ${endTime}
           AND end_time > ${startTime}
