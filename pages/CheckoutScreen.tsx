@@ -1,27 +1,82 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { translations } from '../App';
 
 interface CheckoutScreenProps {
   lang: 'tr' | 'en';
 }
 
+// Plan definitions
+const PLANS: Record<string, { name: string; amount: number; students: number }> = {
+  bronze:  { name: 'Bronze',  amount: 14900, students: 6  },
+  silver:  { name: 'Silver',  amount: 24900, students: 15 },
+  gold:    { name: 'Gold',    amount: 44900, students: 25 },
+};
+
 const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const t = translations[lang];
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [payError, setPayError] = useState('');
 
-  const handlePay = (e: React.FormEvent) => {
+  const planId = searchParams.get('plan') || 'silver';
+  const plan = PLANS[planId] || PLANS.silver;
+
+  const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
+    setPayError('');
+    const token = localStorage.getItem('fittrack_token');
+    try {
+      // Step 1: Create payment intent on server
+      const res = await fetch('/api/payments/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ planId, amount: plan.amount }),
+      });
+      const data = await res.json();
+
+      if (res.status === 503) {
+        // Stripe not configured — demo mode
+        setIsProcessing(false);
+        setPayError(lang === 'tr'
+          ? 'Stripe yapılandırılmamış. Demo: .env dosyasına STRIPE_SECRET_KEY ekleyin.'
+          : 'Stripe not configured. Demo: Add STRIPE_SECRET_KEY to .env file.');
+        return;
+      }
+
+      if (!res.ok) throw new Error(data.message || 'Payment error');
+
+      // Step 2: Confirm with Stripe.js
+      const { loadStripe } = await import('@stripe/stripe-js');
+      const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+      if (!stripePublicKey) throw new Error('VITE_STRIPE_PUBLIC_KEY not set');
+      const stripe = await loadStripe(stripePublicKey);
+      if (!stripe) throw new Error('Stripe failed to load');
+
+      const form = e.target as HTMLFormElement;
+      const cardNumber = (form.querySelector('[name=cardNumber]') as HTMLInputElement)?.value?.replace(/\s/g,'');
+      const expiry = (form.querySelector('[name=expiry]') as HTMLInputElement)?.value?.split('/');
+
+      const { error } = await stripe.confirmCardPayment(data.clientSecret, {
+        payment_method: {
+          card: { token: 'tok_visa' } as any, // In production, use Stripe Elements
+          billing_details: { name: cardNumber || 'Card' },
+        },
+      });
+
+      if (error) throw new Error(error.message);
+
       setIsProcessing(false);
       setIsSuccess(true);
       setTimeout(() => navigate('/library'), 2000);
-    }, 2000);
+    } catch (err: any) {
+      setIsProcessing(false);
+      setPayError(err.message || (lang === 'tr' ? 'Ödeme başarısız.' : 'Payment failed.'));
+    }
   };
 
   if (isSuccess) {
@@ -100,6 +155,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
                 required
                 className="w-full bg-slate-50 dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-xl py-4 pl-12 pr-4 text-sm focus:ring-primary focus:border-primary transition-all text-slate-900 dark:text-white"
                 placeholder="4242 4242 4242 4242"
+                name="cardNumber"
               />
             </div>
           </div>
@@ -111,6 +167,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
                 required
                 className="w-full bg-slate-50 dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-xl py-4 px-4 text-sm focus:ring-primary focus:border-primary transition-all text-slate-900 dark:text-white"
                 placeholder="MM / YY"
+                name="expiry"
               />
             </div>
             <div className="space-y-1.5">
@@ -127,14 +184,20 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ lang }) => {
           <div className="bg-slate-50 dark:bg-card-dark border border-slate-200 dark:border-white/10 rounded-2xl p-5 mt-4">
             <h3 className="text-xs font-black uppercase text-slate-400 dark:text-white/30 mb-4">{t.orderSummary}</h3>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-bold text-slate-600 dark:text-white/60">Silver Plan (15 Students)</span>
-              <span className="text-sm font-bold text-slate-900 dark:text-white">249 TL</span>
+              <span className="text-sm font-bold text-slate-600 dark:text-white/60">{plan.name} Plan ({plan.students} {lang === 'tr' ? 'Öğrenci' : 'Students'})</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">{(plan.amount / 100).toFixed(0)} TL</span>
             </div>
             <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-white/5">
-              <span className="text-base font-black text-slate-900 dark:text-white">Total</span>
-              <span className="text-base font-black text-primary">249 TL</span>
+              <span className="text-base font-black text-slate-900 dark:text-white">{lang === 'tr' ? 'Toplam' : 'Total'}</span>
+              <span className="text-base font-black text-primary">{(plan.amount / 100).toFixed(0)} TL</span>
             </div>
           </div>
+
+          {payError && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+              <p className="text-red-400 text-xs font-bold">{payError}</p>
+            </div>
+          )}
 
           <button 
             disabled={isProcessing}
