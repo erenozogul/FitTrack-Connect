@@ -434,18 +434,6 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// Helper: convert Neon DATE (returned as local-midnight JS Date) to "YYYY-MM-DD" string
-const dateToStr = (d: any): string => {
-  if (!d) return '';
-  if (d instanceof Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return String(d).slice(0, 10);
-};
-
 // GET /api/assignments?date=YYYY-MM-DD - get assignments for a date (trainer sees all their students, student sees their own)
 app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
   try {
