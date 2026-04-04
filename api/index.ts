@@ -116,6 +116,18 @@ try {
           read_at TIMESTAMP
         )
       `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          type VARCHAR(30) DEFAULT 'system',
+          title TEXT NOT NULL,
+          body TEXT DEFAULT '',
+          read BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
     }).then(() => console.log("Database tables verified"))
      .catch(err => console.error("Failed to initialize database tables:", err));
   }
@@ -716,6 +728,84 @@ app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) 
   } catch (error) {
     console.error("Analytics error:", error);
     res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// ─── Stripe Payment ───────────────────────────────────
+// POST /api/payments/create-intent — create a Stripe PaymentIntent
+app.post('/api/payments/create-intent', authenticateToken, async (req: any, res: any) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) return res.status(503).json({ error: 'stripe_not_configured' });
+  try {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeKey);
+    const { planId, amount } = req.body; // amount in kuruş (Turkish lira cents)
+    if (!planId || !amount) return res.status(400).json({ error: 'error_missing_fields' });
+    const intent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'try',
+      metadata: { userId: req.user.userId, planId },
+    });
+    res.json({ clientSecret: intent.client_secret });
+  } catch (error: any) {
+    console.error('Stripe error:', error.message);
+    res.status(500).json({ error: 'stripe_error', message: error.message });
+  }
+});
+
+// ─── Notifications (DB-persisted) ─────────────────────
+// GET /api/notifications
+app.get('/api/notifications', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT id, type, title, body, read, created_at
+      FROM notifications
+      WHERE user_id = ${req.user.userId}
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      type: r.type,
+      title: r.title,
+      body: r.body,
+      read: r.read,
+      time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+    })));
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/notifications — create a notification (internal use)
+app.post('/api/notifications', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { userId, type, title, body } = req.body;
+    const targetId = userId || req.user.userId;
+    const sql = getDb();
+    const result = await sql`
+      INSERT INTO notifications (user_id, type, title, body)
+      VALUES (${targetId}, ${type || 'system'}, ${title}, ${body || ''})
+      RETURNING id
+    `;
+    res.status(201).json({ id: result[0].id });
+  } catch (error) {
+    console.error('Create notification error:', error);
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// PATCH /api/notifications/read — mark all as read
+app.patch('/api/notifications/read', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    await sql`UPDATE notifications SET read = true WHERE user_id = ${req.user.userId}`;
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Mark read error:', error);
+    res.status(500).json({ error: 'error_internal' });
   }
 });
 
