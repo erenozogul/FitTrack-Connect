@@ -3,6 +3,9 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import cors from "cors";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-for-fittrack";
 
@@ -10,6 +13,19 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// ─── File Upload (multer) ─────────────────────────────
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB limit
 
 // Initialize Neon Database
 const getDb = () => {
@@ -120,6 +136,13 @@ const authenticateToken = (req: any, res: any, next: any) => {
     next();
   });
 };
+
+// POST /api/upload — upload a file, returns { url, name, type }
+app.post('/api/upload', authenticateToken, upload.single('file'), (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: 'no_file' });
+  const url = `/uploads/${req.file.filename}`;
+  res.json({ url, name: req.file.originalname, type: req.file.mimetype });
+});
 
 // API Routes
 app.post("/api/auth/register", async (req, res) => {
@@ -550,12 +573,14 @@ app.post("/api/auth/change-password", authenticateToken, async (req: any, res: a
 // POST /api/messages - send a message
 app.post("/api/messages", authenticateToken, async (req: any, res: any) => {
   try {
-    const { receiverId, content, type = 'text' } = req.body;
+    const { receiverId, content, type = 'text', fileName } = req.body;
     if (!receiverId || !content) return res.status(400).json({ error: "error_missing_fields" });
     const sql = getDb();
+    // For file/image/voice: encode as "url|||filename" so we can recover the name on GET
+    const stored = (type !== 'text' && fileName) ? `${content}|||${fileName}` : content;
     const result = await sql`
       INSERT INTO messages (sender_id, receiver_id, content, type)
-      VALUES (${req.user.userId}, ${receiverId}, ${content}, ${type})
+      VALUES (${req.user.userId}, ${receiverId}, ${stored}, ${type})
       RETURNING id, sender_id, receiver_id, content, type, created_at
     `;
     res.status(201).json(result[0]);
@@ -583,14 +608,18 @@ app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any
       UPDATE messages SET read_at = NOW()
       WHERE sender_id = ${contactId} AND receiver_id = ${userId} AND read_at IS NULL
     `;
-    res.json(rows.map((r: any) => ({
-      id: r.id,
-      from: r.sender_id === userId ? 'me' : 'them',
-      text: r.content,
-      type: r.type,
-      time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-      createdAt: r.created_at,
-    })));
+    res.json(rows.map((r: any) => {
+      const parts = r.content.includes('|||') ? r.content.split('|||') : [r.content, undefined];
+      return {
+        id: r.id,
+        from: r.sender_id === userId ? 'me' : 'them',
+        text: parts[0],
+        fileName: parts[1],
+        type: r.type,
+        time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        createdAt: r.created_at,
+      };
+    }));
   } catch (error) {
     console.error("Get messages error:", error);
     res.status(500).json({ error: "error_internal" });
