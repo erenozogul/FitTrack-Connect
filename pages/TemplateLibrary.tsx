@@ -957,7 +957,6 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
           return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
         };
         const hasConflict = existing.some(a =>
-          a.studentId === student.id &&
           toLocalDateStr(String(a.assignedDate)) === assignDate &&
           a.startTime && a.endTime &&
           a.startTime < assignEndTime &&
