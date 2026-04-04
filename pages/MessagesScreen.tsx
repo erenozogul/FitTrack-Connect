@@ -56,6 +56,8 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -200,34 +202,95 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isImage = file.type.startsWith('image/');
-    setMessages(prev => [...prev, { from: 'me', text: file.name, time: getNowTime(), type: isImage ? 'image' : 'file', fileName: file.name }]);
-    e.target.value = '';
-    setIsTyping(true);
-    setTimeout(() => setIsTyping(false), 1500);
+  const uploadFile = async (file: File | Blob, filename?: string): Promise<{ url: string; name: string } | null> => {
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return null;
+    const formData = new FormData();
+    formData.append('file', file, filename || (file instanceof File ? file.name : 'audio.webm'));
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch { return null; }
   };
 
-  const handleMicClick = () => {
+  const sendFileMessage = async (url: string, name: string, type: 'image' | 'file' | 'voice') => {
+    if (!selectedContact) return;
+    try {
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ receiverId: selectedContact.id, content: url, type, fileName: name }),
+      });
+      loadContacts();
+    } catch { /* stays optimistic */ }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedContact) return;
+    const isImage = file.type.startsWith('image/');
+    const msgType: 'image' | 'file' = isImage ? 'image' : 'file';
+    // Optimistic
+    const optimistic: Message = { from: 'me', text: file.name, time: getNowTime(), type: msgType, fileName: file.name };
+    setMessages(prev => [...prev, optimistic]);
+    e.target.value = '';
+    const result = await uploadFile(file);
+    if (result) {
+      await sendFileMessage(result.url, result.name, msgType);
+      // Update optimistic message with real URL
+      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, text: result.url } : m));
+    }
+  };
+
+  const handleMicClick = async () => {
     if (isRecording) {
+      // Stop recording
+      mediaRecorderRef.current?.stop();
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
-      const secs = recordSeconds;
-      setIsRecording(false);
-      setRecordSeconds(0);
-      const dur = secs < 60 ? `0:${secs.toString().padStart(2,'0')}` : `${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`;
-      setMessages(prev => [...prev, { from: 'me', text: dur, time: getNowTime(), type: 'voice' }]);
-      setIsTyping(true);
-      setTimeout(() => setIsTyping(false), 1500);
     } else {
-      setIsRecording(true);
-      setRecordSeconds(0);
-      recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000);
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+        const mr = new MediaRecorder(stream, { mimeType });
+        audioChunksRef.current = [];
+        mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+        mr.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          const secs = recordSeconds;
+          setIsRecording(false);
+          setRecordSeconds(0);
+          const dur = secs < 60 ? `0:${secs.toString().padStart(2,'0')}` : `${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`;
+          const blob = new Blob(audioChunksRef.current, { type: mimeType });
+          // Optimistic
+          setMessages(prev => [...prev, { from: 'me', text: dur, time: getNowTime(), type: 'voice' }]);
+          const result = await uploadFile(blob, `voice-${Date.now()}.webm`);
+          if (result && selectedContact) {
+            await sendFileMessage(result.url, dur, 'voice');
+          }
+        };
+        mr.start();
+        mediaRecorderRef.current = mr;
+        setIsRecording(true);
+        setRecordSeconds(0);
+        recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000);
+      } catch {
+        // Microphone permission denied — fall back to timer-only mock
+        setIsRecording(true);
+        setRecordSeconds(0);
+        recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000);
+      }
     }
   };
 
   const cancelRecording = () => {
+    mediaRecorderRef.current?.stop();
+    audioChunksRef.current = [];
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     setIsRecording(false);
     setRecordSeconds(0);
@@ -330,16 +393,32 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
                     </div>
                     <span className="text-xs font-bold opacity-80 tabular-nums">{msg.text}</span>
                   </div>
-                ) : (msg.type === 'file' || msg.type === 'image') ? (
-                  <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-sm ${msg.from === 'me' ? 'bg-primary text-white rounded-br-sm' : 'bg-card-dark border border-white/5 rounded-bl-sm'}`}>
+                ) : msg.type === 'image' ? (
+                  msg.text.startsWith('/uploads/') ? (
+                    <a href={msg.text} target="_blank" rel="noopener noreferrer">
+                      <img src={msg.text} alt={msg.fileName || 'image'} className="max-w-[220px] rounded-2xl object-cover cursor-pointer hover:opacity-90 transition-opacity" />
+                    </a>
+                  ) : (
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-sm ${msg.from === 'me' ? 'bg-primary text-white rounded-br-sm' : 'bg-card-dark border border-white/5 rounded-bl-sm'}`}>
+                      <div className={`size-9 rounded-xl flex items-center justify-center shrink-0 ${msg.from === 'me' ? 'bg-white/20' : 'bg-primary/20'}`}>
+                        <span className="material-symbols-outlined text-lg">image</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight max-w-[130px] truncate">{msg.fileName || msg.text}</p>
+                        <p className="text-[10px] opacity-60 mt-0.5">{lang === 'tr' ? 'Görsel' : 'Image'}</p>
+                      </div>
+                    </div>
+                  )
+                ) : msg.type === 'file' ? (
+                  <a href={msg.text.startsWith('/uploads/') ? msg.text : undefined} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-sm ${msg.from === 'me' ? 'bg-primary text-white rounded-br-sm' : 'bg-card-dark border border-white/5 rounded-bl-sm'}`}>
                     <div className={`size-9 rounded-xl flex items-center justify-center shrink-0 ${msg.from === 'me' ? 'bg-white/20' : 'bg-primary/20'}`}>
-                      <span className="material-symbols-outlined text-lg">{msg.type === 'image' ? 'image' : 'description'}</span>
+                      <span className="material-symbols-outlined text-lg">description</span>
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold leading-tight max-w-[130px] truncate">{msg.fileName || msg.text}</p>
-                      <p className="text-[10px] opacity-60 mt-0.5">{msg.type === 'image' ? (lang === 'tr' ? 'Görsel' : 'Image') : (lang === 'tr' ? 'Dosya' : 'File')}</p>
+                      <p className="text-[10px] opacity-60 mt-0.5">{lang === 'tr' ? 'Dosya' : 'File'}</p>
                     </div>
-                  </div>
+                  </a>
                 ) : (
                   <div className={`px-4 py-2.5 rounded-2xl shadow-sm text-sm leading-relaxed ${msg.from === 'me' ? 'bg-primary text-white rounded-br-sm' : 'bg-card-dark border border-white/5 text-white rounded-bl-sm'}`}>
                     {msg.text}

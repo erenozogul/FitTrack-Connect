@@ -2,10 +2,14 @@ import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import apiApp from "./api/index";
+import path from "path";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Serve uploaded files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Mount the API routes
   app.use(apiApp);

@@ -161,17 +161,31 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
     localStorage.removeItem('fittrack_avatar');
     setAvatarSrc('');
   };
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      setAvatarSrc(base64);
-      localStorage.setItem('fittrack_avatar', base64);
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
+    // Preview locally first
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarSrc(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    // Upload to server
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (res.ok) {
+        const { url } = await res.json();
+        setAvatarSrc(url);
+        localStorage.setItem('fittrack_avatar', url);
+      }
+    } catch { /* keep local preview */ }
   };
 
   const [firstName, setFirstName] = useState(parsedUser.firstName || '');
