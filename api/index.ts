@@ -536,20 +536,22 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// GET /api/assignments?date=YYYY-MM-DD - get assignments for a date (trainer sees all their students, student sees their own)
+// GET /api/assignments?date=YYYY-MM-DD&limit=N&offset=N - get assignments
 app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
   try {
     const { date } = req.query;
+    const limit = Math.min(parseInt(req.query.limit as string) || 200, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
     const sql = getDb();
     let rows;
     if (req.user.role === 'trainer') {
       rows = date
         ? await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
-        : await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
+        : await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} ORDER BY assigned_date DESC, start_time LIMIT ${limit} OFFSET ${offset}`;
     } else {
       rows = date
         ? await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
-        : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
+        : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date DESC, start_time LIMIT ${limit} OFFSET ${offset}`;
     }
     res.json(rows.map((r: any) => ({
       id: r.id,
@@ -593,18 +595,20 @@ app.patch("/api/assignments/:id/complete", authenticateToken, async (req: any, r
   }
 });
 
-// GET /api/notes?studentId=X - trainer gets notes for a student
+// GET /api/notes?studentId=X&limit=N&offset=N - trainer gets notes for a student
 app.get("/api/notes", authenticateToken, async (req: any, res: any) => {
   try {
     const sql = getDb();
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
     let rows;
     if (req.user.role === 'trainer') {
       const { studentId } = req.query;
       if (!studentId) return res.status(400).json({ error: "error_missing_fields" });
-      rows = await sql`SELECT * FROM notes WHERE trainer_id = ${req.user.userId} AND student_id = ${studentId} ORDER BY created_at DESC`;
+      rows = await sql`SELECT * FROM notes WHERE trainer_id = ${req.user.userId} AND student_id = ${studentId} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else {
       // Student sees their own notes
-      rows = await sql`SELECT * FROM notes WHERE student_id = ${req.user.userId} ORDER BY created_at DESC`;
+      rows = await sql`SELECT * FROM notes WHERE student_id = ${req.user.userId} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     }
     res.json(rows.map((r: any) => ({
       id: r.id,
@@ -683,25 +687,38 @@ app.post("/api/messages", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// GET /api/messages/:contactId - get messages between current user and contact
+// GET /api/messages/:contactId?limit=N&before=<id> - get messages (cursor-based pagination)
 app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any) => {
   try {
     const sql = getDb();
     const contactId = parseInt(req.params.contactId);
     const userId = req.user.userId;
-    const rows = await sql`
-      SELECT id, sender_id, receiver_id, content, type, created_at, read_at
-      FROM messages
-      WHERE (sender_id = ${userId} AND receiver_id = ${contactId})
-         OR (sender_id = ${contactId} AND receiver_id = ${userId})
-      ORDER BY created_at ASC
-    `;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const before = req.query.before ? parseInt(req.query.before as string) : null;
+    const rows = before
+      ? await sql`
+          SELECT id, sender_id, receiver_id, content, type, created_at, read_at
+          FROM messages
+          WHERE ((sender_id = ${userId} AND receiver_id = ${contactId})
+             OR (sender_id = ${contactId} AND receiver_id = ${userId}))
+            AND id < ${before}
+          ORDER BY created_at DESC LIMIT ${limit}
+        `
+      : await sql`
+          SELECT id, sender_id, receiver_id, content, type, created_at, read_at
+          FROM messages
+          WHERE (sender_id = ${userId} AND receiver_id = ${contactId})
+             OR (sender_id = ${contactId} AND receiver_id = ${userId})
+          ORDER BY created_at DESC LIMIT ${limit}
+        `;
+    // Return in chronological order
+    const sorted = [...rows].reverse();
     // Mark received messages as read
     await sql`
       UPDATE messages SET read_at = NOW()
       WHERE sender_id = ${contactId} AND receiver_id = ${userId} AND read_at IS NULL
     `;
-    res.json(rows.map((r: any) => {
+    res.json(sorted.map((r: any) => {
       const parts = r.content.includes('|||') ? r.content.split('|||') : [r.content, undefined];
       return {
         id: r.id,
@@ -711,6 +728,7 @@ app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any
         type: r.type,
         time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         createdAt: r.created_at,
+        hasMore: rows.length === limit,
       };
     }));
   } catch (error) {
