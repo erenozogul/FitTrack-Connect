@@ -47,7 +47,7 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
   const trainerTabs = [
     { icon: 'home', label: t.home, path: '/dashboard' },
     { icon: 'folder', label: t.library, path: '/library' },
-    { icon: 'edit_note', label: lang === 'tr' ? 'Notlar' : 'Notes', path: '/notes' },
+    { icon: 'summarize', label: lang === 'tr' ? 'Rapor' : 'Report', path: '/report' },
     { icon: 'groups', label: lang === 'tr' ? 'Öğrenciler' : 'Students', path: '/students' },
     { icon: 'account_circle', label: t.profile, path: '/profile' },
   ];

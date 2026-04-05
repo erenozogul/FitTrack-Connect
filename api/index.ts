@@ -1059,4 +1059,94 @@ app.patch('/api/notifications/read', authenticateToken, async (req: any, res: an
   }
 });
 
+// ─── Weekly/Monthly Report ────────────────────────────
+// GET /api/report?period=week|month — summary report for trainer or student
+app.get('/api/report', authenticateToken, async (req: any, res: any) => {
+  const period = (req.query.period as string) === 'month' ? 'month' : 'week';
+  const interval = period === 'week' ? '7 days' : '30 days';
+  try {
+    const sql = getDb();
+    const userId = req.user.userId;
+    if (req.user.role === 'trainer') {
+      const [totals, byStudent, byDay, completed] = await Promise.all([
+        sql`
+          SELECT
+            COUNT(*) as total_sessions,
+            COUNT(DISTINCT student_id) as active_students
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+        `,
+        sql`
+          SELECT student_name, COUNT(*) as sessions, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY student_name
+          ORDER BY sessions DESC
+          LIMIT 10
+        `,
+        sql`
+          SELECT TO_CHAR(assigned_date, 'YYYY-MM-DD') as day, COUNT(*) as count
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY day ORDER BY day
+        `,
+        sql`
+          SELECT COUNT(*) as completed FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+            AND completed = true
+        `,
+      ]);
+      res.json({
+        role: 'trainer',
+        period,
+        totalSessions: parseInt(totals[0].total_sessions) || 0,
+        activeStudents: parseInt(totals[0].active_students) || 0,
+        completedSessions: parseInt(completed[0].completed) || 0,
+        byStudent: byStudent.map((r: any) => ({ name: r.student_name, sessions: parseInt(r.sessions), completed: parseInt(r.completed) })),
+        byDay: byDay.map((r: any) => ({ day: r.day, count: parseInt(r.count) })),
+      });
+    } else {
+      const [totals, byWorkout, progress] = await Promise.all([
+        sql`
+          SELECT COUNT(*) as total, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE student_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+        `,
+        sql`
+          SELECT workout_name, COUNT(*) as sessions, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE student_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY workout_name
+          ORDER BY sessions DESC
+          LIMIT 5
+        `,
+        sql`
+          SELECT TO_CHAR(entry_date, 'YYYY-MM-DD') as date, weight, body_fat
+          FROM progress_entries
+          WHERE user_id = ${userId}
+            AND entry_date >= CURRENT_DATE - ${interval}::interval
+          ORDER BY entry_date
+        `,
+      ]);
+      res.json({
+        role: 'student',
+        period,
+        totalSessions: parseInt(totals[0].total) || 0,
+        completedSessions: parseInt(totals[0].completed) || 0,
+        byWorkout: byWorkout.map((r: any) => ({ name: r.workout_name, sessions: parseInt(r.sessions), completed: parseInt(r.completed) })),
+        progress: progress.map((r: any) => ({ date: r.date, weight: r.weight ? parseFloat(r.weight) : null, bodyFat: r.body_fat ? parseFloat(r.body_fat) : null })),
+      });
+    }
+  } catch (error) {
+    console.error('Report error:', error);
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
 export default app;
