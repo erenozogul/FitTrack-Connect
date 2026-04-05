@@ -49,6 +49,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, lang }) => 
       }
 
       localStorage.setItem('fittrack_token', data.token);
+      if (data.refreshToken) localStorage.setItem('fittrack_refresh_token', data.refreshToken);
       localStorage.setItem('fittrack_user', JSON.stringify({ ...data.user, gender }));
       localStorage.setItem('fittrack_gender', gender);
 

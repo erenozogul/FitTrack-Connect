@@ -17,6 +17,9 @@ import StudentsScreen from './pages/StudentsScreen';
 import TrainerProfileScreen from './pages/TrainerProfileScreen';
 import AnalysisNotesScreen from './pages/AnalysisNotesScreen';
 import TrainerAnalyticsScreen from './pages/TrainerAnalyticsScreen';
+import ProgressScreen from './pages/ProgressScreen';
+import TrainerPublicProfile from './pages/TrainerPublicProfile';
+import ReportScreen from './pages/ReportScreen';
 import { UserRole } from './types';
 
 // Add missing error translation keys to translations object
@@ -302,7 +305,12 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const handleLogout = () => {
+    const refreshToken = localStorage.getItem('fittrack_refresh_token');
+    if (refreshToken) {
+      fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken }) }).catch(() => {});
+    }
     localStorage.removeItem('fittrack_token');
+    localStorage.removeItem('fittrack_refresh_token');
     localStorage.removeItem('fittrack_user');
     setIsLoggedIn(false);
     setRole(null);
@@ -340,6 +348,9 @@ const App: React.FC = () => {
           <Route path="/students" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><StudentsScreen lang={lang} onLogout={handleLogout} /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerProfileScreen lang={lang} setLang={setLang} onLogout={handleLogout} userName={userName} role={role as 'trainer' | 'student'} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerAnalyticsScreen lang={lang} /></ProtectedRoute>} />
+          <Route path="/progress" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><ProgressScreen lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
+          <Route path="/trainer/:username" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerPublicProfile lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
+          <Route path="/report" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><ReportScreen lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>

@@ -14,6 +14,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ─── Simple in-memory rate limiter ──────────────────
+// Limits: auth endpoints 10 req/15min, general API 100 req/min
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+const createRateLimit = (maxRequests: number, windowMs: number) => (req: any, res: any, next: any) => {
+  const key = `${req.ip}:${req.path}:${Math.floor(Date.now() / windowMs)}`;
+  const now = Date.now();
+  const entry = rateLimitMap.get(key) || { count: 0, resetAt: now + windowMs };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + windowMs;
+  }
+  entry.count++;
+  rateLimitMap.set(key, entry);
+  if (entry.count > maxRequests) {
+    return res.status(429).json({ error: 'error_too_many_requests' });
+  }
+  next();
+};
+
+// Clean up stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of rateLimitMap.entries()) {
+    if (now > val.resetAt) rateLimitMap.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+const authRateLimit = createRateLimit(10, 15 * 60 * 1000); // 10 req/15min for auth
+const apiRateLimit = createRateLimit(100, 60 * 1000);       // 100 req/min for general API
+app.use('/api', apiRateLimit);
+
 // ─── File Upload (multer) ─────────────────────────────
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -118,6 +150,10 @@ try {
       `;
     }).then(() => {
       return sql`
+        ALTER TABLE assignments ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false;
+      `;
+    }).then(() => {
+      return sql`
         CREATE TABLE IF NOT EXISTS notifications (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -125,6 +161,64 @@ try {
           title TEXT NOT NULL,
           body TEXT DEFAULT '',
           read BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(128) NOT NULL UNIQUE,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false`;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(64) NOT NULL UNIQUE,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS exercise_media (
+          id SERIAL PRIMARY KEY,
+          exercise_id VARCHAR(100) NOT NULL,
+          trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          video_url TEXT NOT NULL,
+          label TEXT DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(exercise_id, trainer_id)
+        )
+      `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS trainer_reviews (
+          id SERIAL PRIMARY KEY,
+          trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+          comment TEXT DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(trainer_id, student_id)
+        )
+      `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS progress_entries (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          entry_date DATE NOT NULL,
+          weight NUMERIC(5,1),
+          body_fat NUMERIC(4,1),
+          notes TEXT DEFAULT '',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
@@ -157,7 +251,7 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req: any, res
 });
 
 // API Routes
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", authRateLimit, async (req, res) => {
   try {
     const { role, firstName, lastName, username, email, password } = req.body;
     
@@ -191,10 +285,30 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = result[0].id;
     const token = jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '7d' });
 
-    res.status(201).json({ 
-      message: "User registered successfully", 
-      token, 
-      user: { id: userId, role, firstName, lastName, username, email } 
+    // Generate email verification token (6-char alphanumeric)
+    const verifyToken = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    try {
+      await sql`
+        INSERT INTO email_verification_tokens (user_id, token, expires_at)
+        VALUES (${userId}, ${verifyToken}, ${expiresAt.toISOString()})
+      `;
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const verifyUrl = `${appUrl}/#/verify-email?token=${verifyToken}`;
+      // If SMTP configured, send email here. Otherwise, log for dev.
+      if (process.env.SMTP_HOST) {
+        // nodemailer would go here
+        console.log(`[EMAIL] Verification for ${email}: ${verifyUrl}`);
+      } else {
+        console.log(`[DEV] Email verification token for ${email}: ${verifyToken} — ${verifyUrl}`);
+      }
+    } catch { /* non-fatal */ }
+
+    res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user: { id: userId, role, firstName, lastName, username, email, emailVerified: false },
+      ...(process.env.NODE_ENV !== 'production' ? { _devVerifyToken: verifyToken } : {}),
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -202,7 +316,47 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+// POST /api/auth/verify-email — verify email with token
+app.post("/api/auth/verify-email", async (req: any, res: any) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT * FROM email_verification_tokens
+      WHERE token = ${token.toUpperCase()} AND expires_at > NOW()
+    `;
+    if (!rows[0]) return res.status(400).json({ error: 'error_invalid_token' });
+    await sql`UPDATE users SET email_verified = true WHERE id = ${rows[0].user_id}`;
+    await sql`DELETE FROM email_verification_tokens WHERE id = ${rows[0].id}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// GET /api/auth/resend-verification — resend verification email
+app.post("/api/auth/resend-verification", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const users = await sql`SELECT * FROM users WHERE id = ${req.user.userId}`;
+    const user = users[0];
+    if (!user) return res.status(404).json({ error: 'not_found' });
+    if (user.email_verified) return res.json({ ok: true, already: true });
+    // Delete old tokens
+    await sql`DELETE FROM email_verification_tokens WHERE user_id = ${req.user.userId}`;
+    const verifyToken = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await sql`INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (${req.user.userId}, ${verifyToken}, ${expiresAt.toISOString()})`;
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    console.log(`[DEV] Resend verify token for ${user.email}: ${verifyToken} — ${appUrl}/#/verify-email?token=${verifyToken}`);
+    res.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { _devVerifyToken: verifyToken } : {}) });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+app.post("/api/auth/login", authRateLimit, async (req, res) => {
   try {
     const { role, usernameOrEmail, password } = req.body;
 
@@ -227,24 +381,72 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "error_invalid_credentials" });
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
 
-    res.json({ 
-      message: "Login successful", 
-      token, 
-      user: { 
-        id: user.id, 
-        role: user.role, 
-        firstName: user.first_name, 
-        lastName: user.last_name, 
-        username: user.username, 
-        email: user.email 
-      } 
+    // Issue refresh token (30 days)
+    let refreshToken: string | undefined;
+    try {
+      const sql2 = getDb();
+      refreshToken = `${user.id}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await sql2`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (${user.id}, ${refreshToken}, ${expiresAt.toISOString()}) ON CONFLICT DO NOTHING`;
+    } catch { /* non-fatal */ }
+
+    res.json({
+      message: "Login successful",
+      token,
+      refreshToken,
+      user: {
+        id: user.id,
+        role: user.role,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+        email: user.email,
+        emailVerified: user.email_verified ?? false,
+      }
     });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "error_internal" });
   }
+});
+
+// POST /api/auth/refresh — exchange refresh token for new access token
+app.post("/api/auth/refresh", async (req: any, res: any) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT rt.*, u.role FROM refresh_tokens rt
+      JOIN users u ON u.id = rt.user_id
+      WHERE rt.token = ${refreshToken} AND rt.expires_at > NOW()
+    `;
+    if (!rows[0]) return res.status(401).json({ error: 'error_invalid_token' });
+    const { user_id, role } = rows[0];
+    // Rotate: delete old, issue new
+    await sql`DELETE FROM refresh_tokens WHERE id = ${rows[0].id}`;
+    const newRefreshToken = `${user_id}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await sql`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (${user_id}, ${newRefreshToken}, ${expiresAt.toISOString()})`;
+    const accessToken = jwt.sign({ userId: user_id, role }, JWT_SECRET, { expiresIn: '15m' });
+    res.json({ token: accessToken, refreshToken: newRefreshToken });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/auth/logout — revoke refresh token
+app.post("/api/auth/logout", async (req: any, res: any) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    try {
+      const sql = getDb();
+      await sql`DELETE FROM refresh_tokens WHERE token = ${refreshToken}`;
+    } catch { /* ignore */ }
+  }
+  res.json({ ok: true });
 });
 
 app.post("/api/auth/forgot-password", async (req, res) => {
@@ -416,6 +618,31 @@ app.get("/api/trainer/students", authenticateToken, async (req: any, res: any) =
   }
 });
 
+// GET /api/users/trainer/:username — public trainer profile lookup
+app.get('/api/users/trainer/:username', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT u.id, u.first_name || ' ' || u.last_name as name, u.username,
+        (SELECT COUNT(*) FROM trainer_student ts WHERE ts.trainer_id = u.id) as total_students,
+        (SELECT COUNT(*) FROM assignments a WHERE a.trainer_id = u.id) as total_sessions
+      FROM users u
+      WHERE u.username = ${req.params.username} AND u.role = 'trainer'
+    `;
+    if (!rows[0]) return res.status(404).json({ error: 'trainer_not_found' });
+    const r = rows[0];
+    res.json({
+      id: r.id,
+      name: r.name,
+      username: r.username,
+      totalStudents: parseInt(r.total_students) || 0,
+      totalSessions: parseInt(r.total_sessions) || 0,
+    });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
 // Helper: convert Neon DATE (JS Date object, UTC midnight) to "YYYY-MM-DD" using local date parts
 const dateToStr = (d: any): string => {
   if (!d) return '';
@@ -471,20 +698,22 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// GET /api/assignments?date=YYYY-MM-DD - get assignments for a date (trainer sees all their students, student sees their own)
+// GET /api/assignments?date=YYYY-MM-DD&limit=N&offset=N - get assignments
 app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
   try {
     const { date } = req.query;
+    const limit = Math.min(parseInt(req.query.limit as string) || 200, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
     const sql = getDb();
     let rows;
     if (req.user.role === 'trainer') {
       rows = date
         ? await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
-        : await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
+        : await sql`SELECT * FROM assignments WHERE trainer_id = ${req.user.userId} ORDER BY assigned_date DESC, start_time LIMIT ${limit} OFFSET ${offset}`;
     } else {
       rows = date
         ? await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
-        : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date, start_time`;
+        : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date DESC, start_time LIMIT ${limit} OFFSET ${offset}`;
     }
     res.json(rows.map((r: any) => ({
       id: r.id,
@@ -495,6 +724,7 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       assignedDate: dateToStr(r.assigned_date),
       startTime: r.start_time,
       endTime: r.end_time,
+      completed: r.completed ?? false,
     })));
   } catch (error) {
     res.status(500).json({ error: "error_internal" });
@@ -512,18 +742,35 @@ app.delete("/api/assignments/:id", authenticateToken, async (req: any, res: any)
   }
 });
 
-// GET /api/notes?studentId=X - trainer gets notes for a student
+// PATCH /api/assignments/:id/complete — student marks assignment as completed
+app.patch("/api/assignments/:id/complete", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const { completed } = req.body;
+    await sql`
+      UPDATE assignments SET completed = ${completed ?? true}
+      WHERE id = ${req.params.id} AND student_id = ${req.user.userId}
+    `;
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// GET /api/notes?studentId=X&limit=N&offset=N - trainer gets notes for a student
 app.get("/api/notes", authenticateToken, async (req: any, res: any) => {
   try {
     const sql = getDb();
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
     let rows;
     if (req.user.role === 'trainer') {
       const { studentId } = req.query;
       if (!studentId) return res.status(400).json({ error: "error_missing_fields" });
-      rows = await sql`SELECT * FROM notes WHERE trainer_id = ${req.user.userId} AND student_id = ${studentId} ORDER BY created_at DESC`;
+      rows = await sql`SELECT * FROM notes WHERE trainer_id = ${req.user.userId} AND student_id = ${studentId} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     } else {
       // Student sees their own notes
-      rows = await sql`SELECT * FROM notes WHERE student_id = ${req.user.userId} ORDER BY created_at DESC`;
+      rows = await sql`SELECT * FROM notes WHERE student_id = ${req.user.userId} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     }
     res.json(rows.map((r: any) => ({
       id: r.id,
@@ -602,25 +849,38 @@ app.post("/api/messages", authenticateToken, async (req: any, res: any) => {
   }
 });
 
-// GET /api/messages/:contactId - get messages between current user and contact
+// GET /api/messages/:contactId?limit=N&before=<id> - get messages (cursor-based pagination)
 app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any) => {
   try {
     const sql = getDb();
     const contactId = parseInt(req.params.contactId);
     const userId = req.user.userId;
-    const rows = await sql`
-      SELECT id, sender_id, receiver_id, content, type, created_at, read_at
-      FROM messages
-      WHERE (sender_id = ${userId} AND receiver_id = ${contactId})
-         OR (sender_id = ${contactId} AND receiver_id = ${userId})
-      ORDER BY created_at ASC
-    `;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const before = req.query.before ? parseInt(req.query.before as string) : null;
+    const rows = before
+      ? await sql`
+          SELECT id, sender_id, receiver_id, content, type, created_at, read_at
+          FROM messages
+          WHERE ((sender_id = ${userId} AND receiver_id = ${contactId})
+             OR (sender_id = ${contactId} AND receiver_id = ${userId}))
+            AND id < ${before}
+          ORDER BY created_at DESC LIMIT ${limit}
+        `
+      : await sql`
+          SELECT id, sender_id, receiver_id, content, type, created_at, read_at
+          FROM messages
+          WHERE (sender_id = ${userId} AND receiver_id = ${contactId})
+             OR (sender_id = ${contactId} AND receiver_id = ${userId})
+          ORDER BY created_at DESC LIMIT ${limit}
+        `;
+    // Return in chronological order
+    const sorted = [...rows].reverse();
     // Mark received messages as read
     await sql`
       UPDATE messages SET read_at = NOW()
       WHERE sender_id = ${contactId} AND receiver_id = ${userId} AND read_at IS NULL
     `;
-    res.json(rows.map((r: any) => {
+    res.json(sorted.map((r: any) => {
       const parts = r.content.includes('|||') ? r.content.split('|||') : [r.content, undefined];
       return {
         id: r.id,
@@ -630,6 +890,7 @@ app.get("/api/messages/:contactId", authenticateToken, async (req: any, res: any
         type: r.type,
         time: new Date(r.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         createdAt: r.created_at,
+        hasMore: rows.length === limit,
       };
     }));
   } catch (error) {
@@ -731,6 +992,175 @@ app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) 
   }
 });
 
+// ─── Exercise Media ────────────────────────────────────
+// GET /api/exercise-media/:exerciseId — all videos for an exercise
+app.get('/api/exercise-media/:exerciseId', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT em.*, u.first_name || ' ' || u.last_name as trainer_name
+      FROM exercise_media em
+      JOIN users u ON u.id = em.trainer_id
+      WHERE em.exercise_id = ${req.params.exerciseId}
+      ORDER BY em.created_at DESC
+    `;
+    res.json(rows.map((r: any) => ({ id: r.id, videoUrl: r.video_url, label: r.label, trainerId: r.trainer_id, trainerName: r.trainer_name })));
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/exercise-media — trainer adds/updates a video for an exercise
+app.post('/api/exercise-media', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'trainer') return res.status(403).json({ error: 'error_forbidden' });
+  const { exerciseId, videoUrl, label } = req.body;
+  if (!exerciseId || !videoUrl) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    await sql`
+      INSERT INTO exercise_media (exercise_id, trainer_id, video_url, label)
+      VALUES (${exerciseId}, ${req.user.userId}, ${videoUrl}, ${label ?? ''})
+      ON CONFLICT (exercise_id, trainer_id) DO UPDATE SET video_url = ${videoUrl}, label = ${label ?? ''}
+    `;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// DELETE /api/exercise-media/:id — trainer removes their video
+app.delete('/api/exercise-media/:id', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM exercise_media WHERE id = ${req.params.id} AND trainer_id = ${req.user.userId}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// ─── Trainer Reviews ──────────────────────────────────
+// GET /api/trainer/:id/reviews — get reviews + avg for a trainer
+app.get('/api/trainer/:id/reviews', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT tr.*, u.first_name || ' ' || u.last_name as student_name, u.username as student_username
+      FROM trainer_reviews tr
+      JOIN users u ON u.id = tr.student_id
+      WHERE tr.trainer_id = ${req.params.id}
+      ORDER BY tr.created_at DESC
+      LIMIT 20
+    `;
+    const avg = rows.length > 0 ? rows.reduce((s: number, r: any) => s + r.rating, 0) / rows.length : null;
+    res.json({
+      average: avg ? Math.round(avg * 10) / 10 : null,
+      count: rows.length,
+      reviews: rows.map((r: any) => ({
+        id: r.id,
+        studentName: r.student_name,
+        studentUsername: r.student_username,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// GET /api/trainer/me/reviews — shorthand for own reviews (trainer)
+app.get('/api/trainer/me/reviews', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'trainer') return res.status(403).json({ error: 'error_forbidden' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT tr.*, u.first_name || ' ' || u.last_name as student_name
+      FROM trainer_reviews tr
+      JOIN users u ON u.id = tr.student_id
+      WHERE tr.trainer_id = ${req.user.userId}
+      ORDER BY tr.created_at DESC
+      LIMIT 20
+    `;
+    const avg = rows.length > 0 ? rows.reduce((s: number, r: any) => s + r.rating, 0) / rows.length : null;
+    res.json({ average: avg ? Math.round(avg * 10) / 10 : null, count: rows.length });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/trainer/:id/review — student submits/updates a review
+app.post('/api/trainer/:id/review', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'student') return res.status(403).json({ error: 'error_forbidden' });
+  const { rating, comment } = req.body;
+  if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    await sql`
+      INSERT INTO trainer_reviews (trainer_id, student_id, rating, comment)
+      VALUES (${req.params.id}, ${req.user.userId}, ${rating}, ${comment ?? ''})
+      ON CONFLICT (trainer_id, student_id) DO UPDATE SET rating = ${rating}, comment = ${comment ?? ''}
+    `;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// ─── Progress Entries ─────────────────────────────────
+// GET /api/progress — get all progress entries for current user
+app.get('/api/progress', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT * FROM progress_entries
+      WHERE user_id = ${req.user.userId}
+      ORDER BY entry_date ASC
+    `;
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      date: dateToStr(r.entry_date),
+      weight: r.weight ? parseFloat(r.weight) : null,
+      bodyFat: r.body_fat ? parseFloat(r.body_fat) : null,
+      notes: r.notes || '',
+    })));
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/progress — add a progress entry
+app.post('/api/progress', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { date, weight, bodyFat, notes } = req.body;
+    if (!date) return res.status(400).json({ error: 'error_missing_fields' });
+    const sql = getDb();
+    const rows = await sql`
+      INSERT INTO progress_entries (user_id, entry_date, weight, body_fat, notes)
+      VALUES (${req.user.userId}, ${date}::date, ${weight ?? null}, ${bodyFat ?? null}, ${notes ?? ''})
+      ON CONFLICT DO NOTHING
+      RETURNING *
+    `;
+    const r = rows[0];
+    if (!r) return res.status(409).json({ error: 'entry_exists' });
+    res.json({ id: r.id, date: dateToStr(r.entry_date), weight: r.weight ? parseFloat(r.weight) : null, bodyFat: r.body_fat ? parseFloat(r.body_fat) : null, notes: r.notes });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// DELETE /api/progress/:id — delete a progress entry
+app.delete('/api/progress/:id', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM progress_entries WHERE id = ${req.params.id} AND user_id = ${req.user.userId}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
 // ─── Stripe Payment ───────────────────────────────────
 // POST /api/payments/create-intent — create a Stripe PaymentIntent
 app.post('/api/payments/create-intent', authenticateToken, async (req: any, res: any) => {
@@ -805,6 +1235,96 @@ app.patch('/api/notifications/read', authenticateToken, async (req: any, res: an
     res.json({ ok: true });
   } catch (error) {
     console.error('Mark read error:', error);
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// ─── Weekly/Monthly Report ────────────────────────────
+// GET /api/report?period=week|month — summary report for trainer or student
+app.get('/api/report', authenticateToken, async (req: any, res: any) => {
+  const period = (req.query.period as string) === 'month' ? 'month' : 'week';
+  const interval = period === 'week' ? '7 days' : '30 days';
+  try {
+    const sql = getDb();
+    const userId = req.user.userId;
+    if (req.user.role === 'trainer') {
+      const [totals, byStudent, byDay, completed] = await Promise.all([
+        sql`
+          SELECT
+            COUNT(*) as total_sessions,
+            COUNT(DISTINCT student_id) as active_students
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+        `,
+        sql`
+          SELECT student_name, COUNT(*) as sessions, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY student_name
+          ORDER BY sessions DESC
+          LIMIT 10
+        `,
+        sql`
+          SELECT TO_CHAR(assigned_date, 'YYYY-MM-DD') as day, COUNT(*) as count
+          FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY day ORDER BY day
+        `,
+        sql`
+          SELECT COUNT(*) as completed FROM assignments
+          WHERE trainer_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+            AND completed = true
+        `,
+      ]);
+      res.json({
+        role: 'trainer',
+        period,
+        totalSessions: parseInt(totals[0].total_sessions) || 0,
+        activeStudents: parseInt(totals[0].active_students) || 0,
+        completedSessions: parseInt(completed[0].completed) || 0,
+        byStudent: byStudent.map((r: any) => ({ name: r.student_name, sessions: parseInt(r.sessions), completed: parseInt(r.completed) })),
+        byDay: byDay.map((r: any) => ({ day: r.day, count: parseInt(r.count) })),
+      });
+    } else {
+      const [totals, byWorkout, progress] = await Promise.all([
+        sql`
+          SELECT COUNT(*) as total, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE student_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+        `,
+        sql`
+          SELECT workout_name, COUNT(*) as sessions, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed
+          FROM assignments
+          WHERE student_id = ${userId}
+            AND assigned_date >= CURRENT_DATE - ${interval}::interval
+          GROUP BY workout_name
+          ORDER BY sessions DESC
+          LIMIT 5
+        `,
+        sql`
+          SELECT TO_CHAR(entry_date, 'YYYY-MM-DD') as date, weight, body_fat
+          FROM progress_entries
+          WHERE user_id = ${userId}
+            AND entry_date >= CURRENT_DATE - ${interval}::interval
+          ORDER BY entry_date
+        `,
+      ]);
+      res.json({
+        role: 'student',
+        period,
+        totalSessions: parseInt(totals[0].total) || 0,
+        completedSessions: parseInt(totals[0].completed) || 0,
+        byWorkout: byWorkout.map((r: any) => ({ name: r.workout_name, sessions: parseInt(r.sessions), completed: parseInt(r.completed) })),
+        progress: progress.map((r: any) => ({ date: r.date, weight: r.weight ? parseFloat(r.weight) : null, bodyFat: r.body_fat ? parseFloat(r.body_fat) : null })),
+      });
+    }
+  } catch (error) {
+    console.error('Report error:', error);
     res.status(500).json({ error: 'error_internal' });
   }
 });

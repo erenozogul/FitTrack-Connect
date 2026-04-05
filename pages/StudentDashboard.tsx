@@ -97,11 +97,35 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
     try { return JSON.parse(localStorage.getItem('fittrack_assignments') || '{}'); } catch { return {}; }
   });
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [completingId, setCompletingId] = useState<number | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
   const [editError, setEditError] = useState('');
   const closeEditModal = () => { setEditingAssignment(null); setEditError(''); };
+
+  const handleCompleteAssignment = async (id: number, dateKey: string, currentCompleted: boolean) => {
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    setCompletingId(id);
+    try {
+      await fetch(`/api/assignments/${id}/complete`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ completed: !currentCompleted }),
+      });
+      setAssignments(prev => {
+        const updated = { ...prev };
+        if (updated[dateKey]) {
+          updated[dateKey] = updated[dateKey].map((a: any) =>
+            a.id === id ? { ...a, completed: !currentCompleted } : a
+          );
+        }
+        return updated;
+      });
+    } catch {}
+    setCompletingId(null);
+  };
 
   const handleDeleteAssignment = async (id: number, dateKey: string) => {
     const token = localStorage.getItem('fittrack_token');
@@ -180,7 +204,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         data.forEach(a => {
           const key = toLocalDate(String(a.assignedDate));
           if (!grouped[key]) grouped[key] = [];
-          grouped[key].push({ id: a.id, studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime });
+          grouped[key].push({ id: a.id, studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime, completed: a.completed ?? false });
         });
         localStorage.setItem('fittrack_assignments', JSON.stringify(grouped));
         setAssignments(grouped);
@@ -510,6 +534,50 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                 </div>
               );
             })()}
+          </section>
+        )}
+
+        {/* Student: Assigned Sessions for selected day */}
+        {!isTrainer && (assignments[selectedDay] || []).length > 0 && (
+          <section>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
+              {lang === 'tr' ? 'Atanan Seanslar' : 'Assigned Sessions'}
+            </h2>
+            <div className="flex flex-col gap-2">
+              {(assignments[selectedDay] || []).map((a: any, idx: number) => (
+                <div key={a.id ?? idx} className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all ${a.completed ? 'bg-green-500/10 border-green-500/20' : 'bg-card-dark border-white/5'}`}>
+                  <div className={`size-10 rounded-full flex items-center justify-center flex-shrink-0 ${a.completed ? 'bg-green-500/20' : 'bg-primary/20'}`}>
+                    <span className={`material-symbols-outlined text-lg ${a.completed ? 'text-green-400' : 'text-primary'}`}>
+                      {a.completed ? 'check_circle' : 'fitness_center'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${a.completed ? 'text-white/50 line-through' : 'text-white'}`}>{a.workoutName}</p>
+                    {(a.startTime || a.endTime) && (
+                      <p className="text-[10px] text-white/40 font-semibold mt-0.5">{a.startTime}{a.endTime ? ` – ${a.endTime}` : ''}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => a.id && handleCompleteAssignment(a.id, selectedDay, a.completed)}
+                    disabled={completingId === a.id}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 ${
+                      a.completed
+                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                        : 'bg-primary text-white hover:bg-primary/80'
+                    }`}
+                  >
+                    {completingId === a.id
+                      ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      : <span className="material-symbols-outlined text-sm">{a.completed ? 'undo' : 'check'}</span>
+                    }
+                    {a.completed
+                      ? (lang === 'tr' ? 'Geri Al' : 'Undo')
+                      : (lang === 'tr' ? 'Tamamla' : 'Complete')
+                    }
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

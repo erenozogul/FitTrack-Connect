@@ -42,6 +42,8 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMsgs, setLoadingMoreMsgs] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,9 +111,10 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
   const loadMessages = useCallback(async (contactId: number, silent = false) => {
     if (!silent) setLoadingMsgs(true);
     try {
-      const res = await fetch(`/api/messages/${contactId}`, { headers: apiHeaders() });
+      const res = await fetch(`/api/messages/${contactId}?limit=50`, { headers: apiHeaders() });
       if (res.ok) {
         const newMsgs = await res.json();
+        setHasMoreMessages(newMsgs.length === 50);
         setMessages(prev => {
           if (prev.length !== newMsgs.length) return newMsgs;
           if (prev.length === 0) return newMsgs;
@@ -123,6 +126,21 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
       }
     } catch { /* ignore */ } finally { if (!silent) setLoadingMsgs(false); }
   }, []);
+
+  const loadMoreMessages = async () => {
+    if (!selectedContact || messages.length === 0 || loadingMoreMsgs) return;
+    const oldest = messages[0];
+    if (!oldest.id) return;
+    setLoadingMoreMsgs(true);
+    try {
+      const res = await fetch(`/api/messages/${selectedContact.id}?limit=50&before=${oldest.id}`, { headers: apiHeaders() });
+      if (res.ok) {
+        const older = await res.json();
+        setHasMoreMessages(older.length === 50);
+        setMessages(prev => [...older, ...prev]);
+      }
+    } catch {} finally { setLoadingMoreMsgs(false); }
+  };
 
   // ─── Poll for new messages every 3s ──────────────────
   useEffect(() => {
@@ -365,6 +383,22 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({ lang, role }) => {
           <div className="flex justify-center py-2">
             <span className="bg-white/5 text-white/30 text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 rounded-full border border-white/5">{todayLabel}</span>
           </div>
+
+          {hasMoreMessages && !loadingMsgs && (
+            <div className="flex justify-center py-3">
+              <button
+                onClick={loadMoreMessages}
+                disabled={loadingMoreMsgs}
+                className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white/50 text-xs font-bold hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 flex items-center gap-2"
+              >
+                {loadingMoreMsgs
+                  ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  : <span className="material-symbols-outlined text-sm">expand_less</span>
+                }
+                {lang === 'tr' ? 'Daha fazla yükle' : 'Load more'}
+              </button>
+            </div>
+          )}
 
           {loadingMsgs && (
             <div className="flex justify-center py-8">
