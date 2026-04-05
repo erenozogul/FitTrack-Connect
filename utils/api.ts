@@ -8,6 +8,7 @@ const headers = () => ({
   'Authorization': `Bearer ${getToken()}`,
 });
 
+
 // Attempt to refresh the access token using the stored refresh token
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
