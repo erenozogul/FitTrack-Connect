@@ -914,6 +914,63 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const hasPremiumAccess = userPlan === 'silver' || userPlan === 'gold';
 
   const isTrainer = role === 'trainer';
+
+  // Exercise media state
+  const [exerciseMedia, setExerciseMedia] = useState<{ id: number; videoUrl: string; label: string; trainerId: number }[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [showAddMedia, setShowAddMedia] = useState(false);
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoLabel, setNewVideoLabel] = useState('');
+
+  useEffect(() => {
+    if (!selectedExercise) { setExerciseMedia([]); setShowAddMedia(false); return; }
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    setMediaLoading(true);
+    fetch(`/api/exercise-media/${selectedExercise.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(setExerciseMedia)
+      .catch(() => {})
+      .finally(() => setMediaLoading(false));
+  }, [selectedExercise]);
+
+  const handleAddMedia = async () => {
+    if (!newVideoUrl.trim() || !selectedExercise) return;
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    await fetch('/api/exercise-media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ exerciseId: selectedExercise.id, videoUrl: newVideoUrl.trim(), label: newVideoLabel }),
+    });
+    // Refresh media list
+    const res = await fetch(`/api/exercise-media/${selectedExercise.id}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setExerciseMedia(await res.json());
+    setNewVideoUrl('');
+    setNewVideoLabel('');
+    setShowAddMedia(false);
+  };
+
+  const handleDeleteMedia = async (mediaId: number) => {
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    await fetch(`/api/exercise-media/${mediaId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setExerciseMedia(prev => prev.filter(m => m.id !== mediaId));
+  };
+
+  const getEmbedUrl = (url: string): string | null => {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+        const vid = u.searchParams.get('v') || u.pathname.split('/').pop() || '';
+        return `https://www.youtube.com/embed/${vid}`;
+      }
+      return url; // raw URL (GIF, mp4, etc.)
+    } catch {
+      return null;
+    }
+  };
+
   const [assignTarget, setAssignTarget] = useState<BodyPart | null>(null);
   const [assignStudentId, setAssignStudentId] = useState<number>(0);
   const [assignDate, setAssignDate] = useState<string>(() => {
@@ -1178,6 +1235,84 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                 <h2 className="text-2xl font-black text-white">{selectedExercise.name}</h2>
               </div>
             </div>
+
+            {/* Exercise Media / Videos */}
+            {(exerciseMedia.length > 0 || isTrainer) && (
+              <div className="bg-card-dark border border-white/5 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+                    {lang === 'tr' ? 'Video / GIF' : 'Video / GIF'}
+                  </p>
+                  {isTrainer && (
+                    <button
+                      onClick={() => setShowAddMedia(v => !v)}
+                      className="flex items-center gap-1 text-primary text-[10px] font-black hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      {lang === 'tr' ? 'Ekle' : 'Add'}
+                    </button>
+                  )}
+                </div>
+                {mediaLoading && <p className="text-white/30 text-xs">{lang === 'tr' ? 'Yükleniyor...' : 'Loading...'}</p>}
+                {exerciseMedia.map(m => {
+                  const embedUrl = getEmbedUrl(m.videoUrl);
+                  return (
+                    <div key={m.id} className="space-y-2">
+                      {m.label && <p className="text-xs font-bold text-white/60">{m.label}</p>}
+                      {embedUrl && (embedUrl.includes('youtube.com/embed') ? (
+                        <div className="relative w-full aspect-video rounded-xl overflow-hidden">
+                          <iframe
+                            src={embedUrl}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className="absolute inset-0 w-full h-full"
+                          />
+                        </div>
+                      ) : (
+                        <img src={embedUrl} alt={m.label || 'exercise'} className="w-full rounded-xl object-contain max-h-56" />
+                      ))}
+                      {isTrainer && (
+                        <button
+                          onClick={() => handleDeleteMedia(m.id)}
+                          className="text-red-400/60 hover:text-red-400 text-[10px] font-bold flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                          {lang === 'tr' ? 'Sil' : 'Delete'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {isTrainer && showAddMedia && (
+                  <div className="space-y-2 pt-2 border-t border-white/5">
+                    <input
+                      type="url"
+                      placeholder={lang === 'tr' ? 'YouTube URL veya GIF linki...' : 'YouTube URL or GIF link...'}
+                      value={newVideoUrl}
+                      onChange={e => setNewVideoUrl(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-primary/50"
+                    />
+                    <input
+                      type="text"
+                      placeholder={lang === 'tr' ? 'Etiket (opsiyonel)' : 'Label (optional)'}
+                      value={newVideoLabel}
+                      onChange={e => setNewVideoLabel(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-primary/50"
+                    />
+                    <button
+                      onClick={handleAddMedia}
+                      disabled={!newVideoUrl.trim()}
+                      className="w-full h-9 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-40"
+                    >
+                      {lang === 'tr' ? 'Kaydet' : 'Save'}
+                    </button>
+                  </div>
+                )}
+                {exerciseMedia.length === 0 && !mediaLoading && !isTrainer && (
+                  <p className="text-white/20 text-xs">{lang === 'tr' ? 'Henüz video eklenmemiş.' : 'No videos added yet.'}</p>
+                )}
+              </div>
+            )}
 
             {/* Summary */}
             <div className="bg-card-dark border border-white/5 rounded-2xl p-5">

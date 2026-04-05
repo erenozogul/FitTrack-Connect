@@ -134,6 +134,18 @@ try {
       `;
     }).then(() => {
       return sql`
+        CREATE TABLE IF NOT EXISTS exercise_media (
+          id SERIAL PRIMARY KEY,
+          exercise_id VARCHAR(100) NOT NULL,
+          trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          video_url TEXT NOT NULL,
+          label TEXT DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(exercise_id, trainer_id)
+        )
+      `;
+    }).then(() => {
+      return sql`
         CREATE TABLE IF NOT EXISTS trainer_reviews (
           id SERIAL PRIMARY KEY,
           trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -797,6 +809,53 @@ app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) 
   } catch (error) {
     console.error("Analytics error:", error);
     res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// ─── Exercise Media ────────────────────────────────────
+// GET /api/exercise-media/:exerciseId — all videos for an exercise
+app.get('/api/exercise-media/:exerciseId', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT em.*, u.first_name || ' ' || u.last_name as trainer_name
+      FROM exercise_media em
+      JOIN users u ON u.id = em.trainer_id
+      WHERE em.exercise_id = ${req.params.exerciseId}
+      ORDER BY em.created_at DESC
+    `;
+    res.json(rows.map((r: any) => ({ id: r.id, videoUrl: r.video_url, label: r.label, trainerId: r.trainer_id, trainerName: r.trainer_name })));
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/exercise-media — trainer adds/updates a video for an exercise
+app.post('/api/exercise-media', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'trainer') return res.status(403).json({ error: 'error_forbidden' });
+  const { exerciseId, videoUrl, label } = req.body;
+  if (!exerciseId || !videoUrl) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    await sql`
+      INSERT INTO exercise_media (exercise_id, trainer_id, video_url, label)
+      VALUES (${exerciseId}, ${req.user.userId}, ${videoUrl}, ${label ?? ''})
+      ON CONFLICT (exercise_id, trainer_id) DO UPDATE SET video_url = ${videoUrl}, label = ${label ?? ''}
+    `;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// DELETE /api/exercise-media/:id — trainer removes their video
+app.delete('/api/exercise-media/:id', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM exercise_media WHERE id = ${req.params.id} AND trainer_id = ${req.user.userId}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
   }
 });
 
