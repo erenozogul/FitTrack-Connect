@@ -120,6 +120,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ role, onLogin, lang }) => {
       }
 
       localStorage.setItem('fittrack_token', data.token);
+      if (data.refreshToken) localStorage.setItem('fittrack_refresh_token', data.refreshToken);
       localStorage.setItem('fittrack_user', JSON.stringify(data.user));
 
       onLogin(`${data.user.firstName} ${data.user.lastName}`, data.user.role);

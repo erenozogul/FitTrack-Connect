@@ -14,6 +14,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ─── Simple in-memory rate limiter ──────────────────
+// Limits: auth endpoints 10 req/15min, general API 100 req/min
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+const createRateLimit = (maxRequests: number, windowMs: number) => (req: any, res: any, next: any) => {
+  const key = `${req.ip}:${req.path}:${Math.floor(Date.now() / windowMs)}`;
+  const now = Date.now();
+  const entry = rateLimitMap.get(key) || { count: 0, resetAt: now + windowMs };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + windowMs;
+  }
+  entry.count++;
+  rateLimitMap.set(key, entry);
+  if (entry.count > maxRequests) {
+    return res.status(429).json({ error: 'error_too_many_requests' });
+  }
+  next();
+};
+
+// Clean up stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of rateLimitMap.entries()) {
+    if (now > val.resetAt) rateLimitMap.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+const authRateLimit = createRateLimit(10, 15 * 60 * 1000); // 10 req/15min for auth
+const apiRateLimit = createRateLimit(100, 60 * 1000);       // 100 req/min for general API
+app.use('/api', apiRateLimit);
+
 // ─── File Upload (multer) ─────────────────────────────
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -134,6 +166,28 @@ try {
       `;
     }).then(() => {
       return sql`
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(128) NOT NULL UNIQUE,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false`;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(64) NOT NULL UNIQUE,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`
         CREATE TABLE IF NOT EXISTS exercise_media (
           id SERIAL PRIMARY KEY,
           exercise_id VARCHAR(100) NOT NULL,
@@ -197,7 +251,7 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req: any, res
 });
 
 // API Routes
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", authRateLimit, async (req, res) => {
   try {
     const { role, firstName, lastName, username, email, password } = req.body;
     
@@ -231,10 +285,30 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = result[0].id;
     const token = jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '7d' });
 
-    res.status(201).json({ 
-      message: "User registered successfully", 
-      token, 
-      user: { id: userId, role, firstName, lastName, username, email } 
+    // Generate email verification token (6-char alphanumeric)
+    const verifyToken = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    try {
+      await sql`
+        INSERT INTO email_verification_tokens (user_id, token, expires_at)
+        VALUES (${userId}, ${verifyToken}, ${expiresAt.toISOString()})
+      `;
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const verifyUrl = `${appUrl}/#/verify-email?token=${verifyToken}`;
+      // If SMTP configured, send email here. Otherwise, log for dev.
+      if (process.env.SMTP_HOST) {
+        // nodemailer would go here
+        console.log(`[EMAIL] Verification for ${email}: ${verifyUrl}`);
+      } else {
+        console.log(`[DEV] Email verification token for ${email}: ${verifyToken} — ${verifyUrl}`);
+      }
+    } catch { /* non-fatal */ }
+
+    res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user: { id: userId, role, firstName, lastName, username, email, emailVerified: false },
+      ...(process.env.NODE_ENV !== 'production' ? { _devVerifyToken: verifyToken } : {}),
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -242,7 +316,47 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+// POST /api/auth/verify-email — verify email with token
+app.post("/api/auth/verify-email", async (req: any, res: any) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT * FROM email_verification_tokens
+      WHERE token = ${token.toUpperCase()} AND expires_at > NOW()
+    `;
+    if (!rows[0]) return res.status(400).json({ error: 'error_invalid_token' });
+    await sql`UPDATE users SET email_verified = true WHERE id = ${rows[0].user_id}`;
+    await sql`DELETE FROM email_verification_tokens WHERE id = ${rows[0].id}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// GET /api/auth/resend-verification — resend verification email
+app.post("/api/auth/resend-verification", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const users = await sql`SELECT * FROM users WHERE id = ${req.user.userId}`;
+    const user = users[0];
+    if (!user) return res.status(404).json({ error: 'not_found' });
+    if (user.email_verified) return res.json({ ok: true, already: true });
+    // Delete old tokens
+    await sql`DELETE FROM email_verification_tokens WHERE user_id = ${req.user.userId}`;
+    const verifyToken = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await sql`INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (${req.user.userId}, ${verifyToken}, ${expiresAt.toISOString()})`;
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    console.log(`[DEV] Resend verify token for ${user.email}: ${verifyToken} — ${appUrl}/#/verify-email?token=${verifyToken}`);
+    res.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { _devVerifyToken: verifyToken } : {}) });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+app.post("/api/auth/login", authRateLimit, async (req, res) => {
   try {
     const { role, usernameOrEmail, password } = req.body;
 
@@ -267,24 +381,72 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "error_invalid_credentials" });
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
 
-    res.json({ 
-      message: "Login successful", 
-      token, 
-      user: { 
-        id: user.id, 
-        role: user.role, 
-        firstName: user.first_name, 
-        lastName: user.last_name, 
-        username: user.username, 
-        email: user.email 
-      } 
+    // Issue refresh token (30 days)
+    let refreshToken: string | undefined;
+    try {
+      const sql2 = getDb();
+      refreshToken = `${user.id}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await sql2`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (${user.id}, ${refreshToken}, ${expiresAt.toISOString()}) ON CONFLICT DO NOTHING`;
+    } catch { /* non-fatal */ }
+
+    res.json({
+      message: "Login successful",
+      token,
+      refreshToken,
+      user: {
+        id: user.id,
+        role: user.role,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+        email: user.email,
+        emailVerified: user.email_verified ?? false,
+      }
     });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "error_internal" });
   }
+});
+
+// POST /api/auth/refresh — exchange refresh token for new access token
+app.post("/api/auth/refresh", async (req: any, res: any) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT rt.*, u.role FROM refresh_tokens rt
+      JOIN users u ON u.id = rt.user_id
+      WHERE rt.token = ${refreshToken} AND rt.expires_at > NOW()
+    `;
+    if (!rows[0]) return res.status(401).json({ error: 'error_invalid_token' });
+    const { user_id, role } = rows[0];
+    // Rotate: delete old, issue new
+    await sql`DELETE FROM refresh_tokens WHERE id = ${rows[0].id}`;
+    const newRefreshToken = `${user_id}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    await sql`INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (${user_id}, ${newRefreshToken}, ${expiresAt.toISOString()})`;
+    const accessToken = jwt.sign({ userId: user_id, role }, JWT_SECRET, { expiresIn: '15m' });
+    res.json({ token: accessToken, refreshToken: newRefreshToken });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/auth/logout — revoke refresh token
+app.post("/api/auth/logout", async (req: any, res: any) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    try {
+      const sql = getDb();
+      await sql`DELETE FROM refresh_tokens WHERE token = ${refreshToken}`;
+    } catch { /* ignore */ }
+  }
+  res.json({ ok: true });
 });
 
 app.post("/api/auth/forgot-password", async (req, res) => {

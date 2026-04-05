@@ -305,7 +305,12 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const handleLogout = () => {
+    const refreshToken = localStorage.getItem('fittrack_refresh_token');
+    if (refreshToken) {
+      fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken }) }).catch(() => {});
+    }
     localStorage.removeItem('fittrack_token');
+    localStorage.removeItem('fittrack_refresh_token');
     localStorage.removeItem('fittrack_user');
     setIsLoggedIn(false);
     setRole(null);
