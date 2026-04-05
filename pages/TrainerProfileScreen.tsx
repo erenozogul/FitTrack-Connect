@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
@@ -23,6 +24,7 @@ type ModalType = 'personalInfo' | 'password' | 'notifications' | 'help' | 'setti
 interface ConnectedTrainer { id: number; name: string; username: string; code: string; avatar?: string; }
 
 const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
+  const navigate = useNavigate();
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,18 +70,20 @@ const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
           {lang === 'tr' ? 'Antrenörüm' : 'My Trainer'}
         </p>
         <div className="flex items-center gap-3">
-          <img
-            src={connected.avatar || `https://picsum.photos/seed/${connected.username}/100/100`}
-            alt={connected.name}
-            className="size-10 rounded-full object-cover border-2 border-primary/30"
-          />
-          <div>
-            <p className="text-white font-bold text-sm">{connected.name}</p>
-            <p className="text-white/40 text-xs font-mono">@{connected.username}</p>
-          </div>
+          <button onClick={() => navigate(`/trainer/${connected.username}`)} className="flex items-center gap-3 flex-1 text-left active:opacity-70 transition-opacity">
+            <img
+              src={connected.avatar || `https://picsum.photos/seed/${connected.username}/100/100`}
+              alt={connected.name}
+              className="size-10 rounded-full object-cover border-2 border-primary/30"
+            />
+            <div>
+              <p className="text-white font-bold text-sm">{connected.name}</p>
+              <p className="text-white/40 text-xs font-mono">@{connected.username}</p>
+            </div>
+          </button>
           <button
             onClick={() => { localStorage.removeItem('fittrack_connected_trainer'); setConnected(null); }}
-            className="ml-auto text-white/30 hover:text-red-400 transition-colors"
+            className="text-white/30 hover:text-red-400 transition-colors"
             title={lang === 'tr' ? 'Bağlantıyı kes' : 'Disconnect'}
           >
             <span className="material-symbols-outlined text-lg">link_off</span>

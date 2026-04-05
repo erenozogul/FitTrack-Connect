@@ -444,6 +444,31 @@ app.get("/api/trainer/students", authenticateToken, async (req: any, res: any) =
   }
 });
 
+// GET /api/users/trainer/:username — public trainer profile lookup
+app.get('/api/users/trainer/:username', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT u.id, u.first_name || ' ' || u.last_name as name, u.username,
+        (SELECT COUNT(*) FROM trainer_student ts WHERE ts.trainer_id = u.id) as total_students,
+        (SELECT COUNT(*) FROM assignments a WHERE a.trainer_id = u.id) as total_sessions
+      FROM users u
+      WHERE u.username = ${req.params.username} AND u.role = 'trainer'
+    `;
+    if (!rows[0]) return res.status(404).json({ error: 'trainer_not_found' });
+    const r = rows[0];
+    res.json({
+      id: r.id,
+      name: r.name,
+      username: r.username,
+      totalStudents: parseInt(r.total_students) || 0,
+      totalSessions: parseInt(r.total_sessions) || 0,
+    });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
 // Helper: convert Neon DATE (JS Date object, UTC midnight) to "YYYY-MM-DD" using local date parts
 const dateToStr = (d: any): string => {
   if (!d) return '';

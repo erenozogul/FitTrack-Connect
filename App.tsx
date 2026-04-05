@@ -18,6 +18,7 @@ import TrainerProfileScreen from './pages/TrainerProfileScreen';
 import AnalysisNotesScreen from './pages/AnalysisNotesScreen';
 import TrainerAnalyticsScreen from './pages/TrainerAnalyticsScreen';
 import ProgressScreen from './pages/ProgressScreen';
+import TrainerPublicProfile from './pages/TrainerPublicProfile';
 import { UserRole } from './types';
 
 // Add missing error translation keys to translations object
@@ -342,6 +343,7 @@ const App: React.FC = () => {
           <Route path="/profile" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerProfileScreen lang={lang} setLang={setLang} onLogout={handleLogout} userName={userName} role={role as 'trainer' | 'student'} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerAnalyticsScreen lang={lang} /></ProtectedRoute>} />
           <Route path="/progress" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><ProgressScreen lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
+          <Route path="/trainer/:username" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TrainerPublicProfile lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
