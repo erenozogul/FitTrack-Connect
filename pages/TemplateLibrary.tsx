@@ -929,6 +929,9 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const [assignSuccess, setAssignSuccess] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [realStudents, setRealStudents] = useState<{ id: number; name: string }[]>([]);
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
+  const [recurringWeeks, setRecurringWeeks] = useState(4);
 
   useEffect(() => {
     if (!isTrainer) return;
@@ -946,9 +949,25 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     const student = realStudents.find(s => s.id === assignStudentId);
     if (!student || !assignTarget) return;
     setAssignError(null);
+
+    // Build list of dates to assign
+    const datesToAssign: string[] = [];
+    if (recurringEnabled && recurringDays.length > 0) {
+      const start = new Date(assignDate + 'T12:00:00');
+      for (let w = 0; w < recurringWeeks; w++) {
+        for (const dow of recurringDays) {
+          const d = new Date(start);
+          d.setDate(start.getDate() + w * 7 + ((dow - start.getDay() + 7) % 7));
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          if (!datesToAssign.includes(key)) datesToAssign.push(key);
+        }
+      }
+      datesToAssign.sort();
+    } else {
+      datesToAssign.push(assignDate);
+    }
+
     try {
-      // Client-side conflict check: fetch existing assignments for this student
-      // and verify no time overlap before calling the API
       if (assignStartTime && assignEndTime) {
         const existing: any[] = await api.get('/api/assignments');
         const toLocalDateStr = (d: string) => {
@@ -956,27 +975,31 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
           if (isNaN(dt.getTime())) return d.slice(0, 10);
           return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
         };
-        const hasConflict = existing.some(a =>
-          toLocalDateStr(String(a.assignedDate)) === assignDate &&
-          a.startTime && a.endTime &&
-          a.startTime < assignEndTime &&
-          a.endTime > assignStartTime
+        const conflictDate = datesToAssign.find(date =>
+          existing.some(a =>
+            toLocalDateStr(String(a.assignedDate)) === date &&
+            a.startTime && a.endTime &&
+            a.startTime < assignEndTime &&
+            a.endTime > assignStartTime
+          )
         );
-        if (hasConflict) {
-          setAssignError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
+        if (conflictDate) {
+          setAssignError(lang === 'tr' ? `${conflictDate} tarihinde bu saat aralığında çakışma var!` : `Time conflict on ${conflictDate}!`);
           return;
         }
       }
 
-      await api.post('/api/assignments', {
-        studentId: student.id,
-        studentName: student.name,
-        workoutId: assignTarget.id,
-        workoutName: assignTarget.name[lang],
-        assignedDate: assignDate,
-        startTime: assignStartTime,
-        endTime: assignEndTime,
-      });
+      for (const date of datesToAssign) {
+        await api.post('/api/assignments', {
+          studentId: student.id,
+          studentName: student.name,
+          workoutId: assignTarget.id,
+          workoutName: assignTarget.name[lang],
+          assignedDate: date,
+          startTime: assignStartTime,
+          endTime: assignEndTime,
+        });
+      }
     } catch (err: any) {
       if (err?.error === 'error_time_conflict') {
         setAssignError(lang === 'tr' ? 'Bu saat aralığında zaten bir seans var!' : 'A session already exists in this time slot!');
@@ -988,10 +1011,12 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     addNotification({
       type: 'assignment',
       title: lang === 'tr' ? 'Yeni Antrenman Atandı' : 'New Workout Assigned',
-      body: `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
+      body: recurringEnabled
+        ? `${student.name} → ${assignTarget.name[lang]} • ${datesToAssign.length} seans`
+        : `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
     });
     setAssignSuccess(true);
-    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); setAssignError(null); }, 1200);
+    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); setAssignError(null); setRecurringEnabled(false); setRecurringDays([]); }, 1200);
   };
 
   const handleLogoutClick = () => { onLogout(); window.location.hash = '#/'; };
@@ -1273,6 +1298,56 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                     onChange={e => setAssignDate(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
                   />
+                </div>
+
+                {/* Recurring toggle */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Tekrarlayan' : 'Recurring'}</p>
+                    <button
+                      type="button"
+                      onClick={() => setRecurringEnabled(v => !v)}
+                      className={`relative w-10 h-5 rounded-full transition-colors ${recurringEnabled ? 'bg-primary' : 'bg-white/10'}`}
+                    >
+                      <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${recurringEnabled ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                  {recurringEnabled && (
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <p className="text-[9px] text-white/30 font-bold uppercase mb-2">{lang === 'tr' ? 'Hangi günler?' : 'Which days?'}</p>
+                        <div className="flex gap-1.5">
+                          {(lang === 'tr'
+                            ? ['Pz','Pt','Sa','Ça','Pe','Cu','Ct']
+                            : ['Su','Mo','Tu','We','Th','Fr','Sa']
+                          ).map((label, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setRecurringDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx])}
+                              className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-colors ${recurringDays.includes(idx) ? 'bg-primary text-white' : 'bg-white/5 text-white/40'}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-white/30 font-bold uppercase mb-1">{lang === 'tr' ? `Kaç hafta? (${recurringWeeks})` : `How many weeks? (${recurringWeeks})`}</p>
+                        <input
+                          type="range"
+                          min="1"
+                          max="12"
+                          value={recurringWeeks}
+                          onChange={e => setRecurringWeeks(parseInt(e.target.value))}
+                          className="w-full accent-primary"
+                        />
+                        <div className="flex justify-between text-[8px] text-white/20 font-bold">
+                          <span>1</span><span>4</span><span>8</span><span>12</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Time range */}

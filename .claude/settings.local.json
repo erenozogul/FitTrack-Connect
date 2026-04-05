@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:3000/api/me)",
+      "Bash(curl -s http://localhost:3000/api/assignments -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d \"{\"\"role\"\":\"\"trainer\"\",\"\"usernameOrEmail\"\":\"\"ernbngl\"\",\"\"password\"\":\"\"qwe123\"\"}\")",
+      "Bash(curl -s http://localhost:3000/api/_which)",
+      "Bash(netstat -ano)",
+      "Bash(cp \"C:/Users/Dell/OneDrive/Masaüstü/workspace/FitTrack-Connect/.claude/worktrees/practical-ellis/pages/StudentDashboard.tsx\" \"C:/Users/Dell/OneDrive/Masaüstü/workspace/FitTrack-Connect/pages/StudentDashboard.tsx\")",
+      "Bash(cp \"C:/Users/Dell/OneDrive/Masaüstü/workspace/FitTrack-Connect/.claude/worktrees/practical-ellis/pages/TemplateLibrary.tsx\" \"C:/Users/Dell/OneDrive/Masaüstü/workspace/FitTrack-Connect/pages/TemplateLibrary.tsx\")"
+    ]
+  }
+}

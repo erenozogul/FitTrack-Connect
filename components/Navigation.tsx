@@ -54,7 +54,7 @@ export const BottomNav: React.FC<{ role: 'trainer' | 'student', lang: 'tr' | 'en
 
   const studentTabs = [
     { icon: 'home', label: t.home, path: '/dashboard' },
-    { icon: 'folder', label: t.library, path: '/library' },
+    { icon: 'show_chart', label: lang === 'tr' ? 'İlerleme' : 'Progress', path: '/progress' },
     { icon: 'edit_note', label: lang === 'tr' ? 'Notlar' : 'Notes', path: '/notes' },
     { icon: 'account_circle', label: t.profile, path: '/profile' },
   ];

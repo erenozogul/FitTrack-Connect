@@ -118,6 +118,10 @@ try {
       `;
     }).then(() => {
       return sql`
+        ALTER TABLE assignments ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false;
+      `;
+    }).then(() => {
+      return sql`
         CREATE TABLE IF NOT EXISTS notifications (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -125,6 +129,18 @@ try {
           title TEXT NOT NULL,
           body TEXT DEFAULT '',
           read BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    }).then(() => {
+      return sql`
+        CREATE TABLE IF NOT EXISTS progress_entries (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          entry_date DATE NOT NULL,
+          weight NUMERIC(5,1),
+          body_fat NUMERIC(4,1),
+          notes TEXT DEFAULT '',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
@@ -495,6 +511,7 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       assignedDate: dateToStr(r.assigned_date),
       startTime: r.start_time,
       endTime: r.end_time,
+      completed: r.completed ?? false,
     })));
   } catch (error) {
     res.status(500).json({ error: "error_internal" });
@@ -507,6 +524,21 @@ app.delete("/api/assignments/:id", authenticateToken, async (req: any, res: any)
     const sql = getDb();
     await sql`DELETE FROM assignments WHERE id = ${req.params.id} AND trainer_id = ${req.user.userId}`;
     res.json({ message: "deleted" });
+  } catch (error) {
+    res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// PATCH /api/assignments/:id/complete — student marks assignment as completed
+app.patch("/api/assignments/:id/complete", authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const { completed } = req.body;
+    await sql`
+      UPDATE assignments SET completed = ${completed ?? true}
+      WHERE id = ${req.params.id} AND student_id = ${req.user.userId}
+    `;
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ error: "error_internal" });
   }
@@ -728,6 +760,59 @@ app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) 
   } catch (error) {
     console.error("Analytics error:", error);
     res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// ─── Progress Entries ─────────────────────────────────
+// GET /api/progress — get all progress entries for current user
+app.get('/api/progress', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT * FROM progress_entries
+      WHERE user_id = ${req.user.userId}
+      ORDER BY entry_date ASC
+    `;
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      date: dateToStr(r.entry_date),
+      weight: r.weight ? parseFloat(r.weight) : null,
+      bodyFat: r.body_fat ? parseFloat(r.body_fat) : null,
+      notes: r.notes || '',
+    })));
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/progress — add a progress entry
+app.post('/api/progress', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { date, weight, bodyFat, notes } = req.body;
+    if (!date) return res.status(400).json({ error: 'error_missing_fields' });
+    const sql = getDb();
+    const rows = await sql`
+      INSERT INTO progress_entries (user_id, entry_date, weight, body_fat, notes)
+      VALUES (${req.user.userId}, ${date}::date, ${weight ?? null}, ${bodyFat ?? null}, ${notes ?? ''})
+      ON CONFLICT DO NOTHING
+      RETURNING *
+    `;
+    const r = rows[0];
+    if (!r) return res.status(409).json({ error: 'entry_exists' });
+    res.json({ id: r.id, date: dateToStr(r.entry_date), weight: r.weight ? parseFloat(r.weight) : null, bodyFat: r.body_fat ? parseFloat(r.body_fat) : null, notes: r.notes });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// DELETE /api/progress/:id — delete a progress entry
+app.delete('/api/progress/:id', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    await sql`DELETE FROM progress_entries WHERE id = ${req.params.id} AND user_id = ${req.user.userId}`;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
   }
 });
 
