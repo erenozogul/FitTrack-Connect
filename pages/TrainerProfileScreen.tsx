@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 
@@ -130,6 +130,82 @@ const ConnectTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
   );
 };
 
+/* ──────────────────────────────────────────────────
+   RateTrainerSection – student rates their trainer
+────────────────────────────────────────────────── */
+const RateTrainerSection: React.FC<{ lang: 'tr' | 'en' }> = ({ lang }) => {
+  const connected = (() => { try { return JSON.parse(localStorage.getItem('fittrack_connected_trainer') || 'null'); } catch { return null; } })();
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(0);
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!connected) return null;
+
+  const handleSubmit = async () => {
+    if (!rating) { setError(lang === 'tr' ? 'Lütfen bir puan seçin.' : 'Please select a rating.'); return; }
+    setSaving(true); setError('');
+    try {
+      const token = localStorage.getItem('fittrack_token');
+      const res = await fetch(`/api/trainer/${connected.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rating, comment }),
+      });
+      if (!res.ok) throw new Error();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError(lang === 'tr' ? 'Hata oluştu, tekrar deneyin.' : 'Error occurred, please try again.');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-card-dark border border-white/5 rounded-2xl p-4 mb-4">
+      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">
+        {lang === 'tr' ? 'Antrenörünü Değerlendir' : 'Rate Your Trainer'}
+      </p>
+      <p className="text-white/60 text-xs mb-3">{connected.name}</p>
+      <div className="flex gap-2 mb-3">
+        {[1,2,3,4,5].map(s => (
+          <button
+            key={s}
+            type="button"
+            onMouseEnter={() => setHover(s)}
+            onMouseLeave={() => setHover(0)}
+            onClick={() => setRating(s)}
+            className="text-2xl transition-transform active:scale-90"
+          >
+            {(hover || rating) >= s ? '⭐' : '☆'}
+          </button>
+        ))}
+      </div>
+      <input
+        type="text"
+        placeholder={lang === 'tr' ? 'Yorum (opsiyonel)...' : 'Comment (optional)...'}
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-primary/50 transition-colors mb-3"
+      />
+      {error && <p className="text-red-400 text-xs font-semibold mb-2">{error}</p>}
+      {saved && <p className="text-green-400 text-xs font-semibold mb-2">{lang === 'tr' ? 'Değerlendirme kaydedildi!' : 'Review saved!'}</p>}
+      <button
+        onClick={handleSubmit}
+        disabled={saving}
+        className="w-full h-10 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+      >
+        {saving
+          ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+          : <><span className="material-symbols-outlined text-sm">star</span>{lang === 'tr' ? 'Gönder' : 'Submit'}</>
+        }
+      </button>
+    </div>
+  );
+};
+
 const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   lang, setLang, onLogout, userName, role = 'trainer', isDarkMode, setIsDarkMode
 }) => {
@@ -199,6 +275,17 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
   const [confirmPw, setConfirmPw] = useState('');
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
+
+  const [trainerRating, setTrainerRating] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isTrainer) return;
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    fetch('/api/trainer/me/reviews', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.average) setTrainerRating(d.average); })
+      .catch(() => {});
+  }, [isTrainer]);
 
   const trainerCode = (parsedUser.username || 'TRAINER').toUpperCase().replace(/[^A-Z0-9]/g, '') + '2026';
   const connectedStudentsCount = (() => {
@@ -397,7 +484,10 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
           </div>
           <div className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-2xl p-4 text-center transition-colors">
             <p className="text-2xl font-black text-slate-900 dark:text-white">
-              {isTrainer ? '4.9 ⭐' : (weight ? `${weight} kg` : '—')}
+              {isTrainer
+                ? (trainerRating != null ? `${trainerRating} ⭐` : '— ⭐')
+                : (weight ? `${weight} kg` : '—')
+              }
             </p>
             <p className="text-[10px] text-slate-500 dark:text-white/40 uppercase mt-1">
               {isTrainer ? (lang === 'tr' ? 'Değerlendirme' : 'Rating') : (lang === 'tr' ? 'Güncel Kilo' : 'Current Weight')}
@@ -433,6 +523,7 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
             </div>
           )}
           {!isTrainer && <ConnectTrainerSection lang={lang} />}
+          {!isTrainer && <RateTrainerSection lang={lang} />}
           <div className="flex flex-col gap-2">
             {[
               { icon: 'person', label: lang === 'tr' ? 'Kişisel Bilgiler' : 'Personal Info', modal: 'personalInfo' as ModalType },

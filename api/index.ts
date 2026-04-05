@@ -134,6 +134,18 @@ try {
       `;
     }).then(() => {
       return sql`
+        CREATE TABLE IF NOT EXISTS trainer_reviews (
+          id SERIAL PRIMARY KEY,
+          trainer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+          comment TEXT DEFAULT '',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(trainer_id, student_id)
+        )
+      `;
+    }).then(() => {
+      return sql`
         CREATE TABLE IF NOT EXISTS progress_entries (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -760,6 +772,75 @@ app.get("/api/trainer/analytics", authenticateToken, async (req: any, res: any) 
   } catch (error) {
     console.error("Analytics error:", error);
     res.status(500).json({ error: "error_internal" });
+  }
+});
+
+// ─── Trainer Reviews ──────────────────────────────────
+// GET /api/trainer/:id/reviews — get reviews + avg for a trainer
+app.get('/api/trainer/:id/reviews', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT tr.*, u.first_name || ' ' || u.last_name as student_name, u.username as student_username
+      FROM trainer_reviews tr
+      JOIN users u ON u.id = tr.student_id
+      WHERE tr.trainer_id = ${req.params.id}
+      ORDER BY tr.created_at DESC
+      LIMIT 20
+    `;
+    const avg = rows.length > 0 ? rows.reduce((s: number, r: any) => s + r.rating, 0) / rows.length : null;
+    res.json({
+      average: avg ? Math.round(avg * 10) / 10 : null,
+      count: rows.length,
+      reviews: rows.map((r: any) => ({
+        id: r.id,
+        studentName: r.student_name,
+        studentUsername: r.student_username,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// GET /api/trainer/me/reviews — shorthand for own reviews (trainer)
+app.get('/api/trainer/me/reviews', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'trainer') return res.status(403).json({ error: 'error_forbidden' });
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT tr.*, u.first_name || ' ' || u.last_name as student_name
+      FROM trainer_reviews tr
+      JOIN users u ON u.id = tr.student_id
+      WHERE tr.trainer_id = ${req.user.userId}
+      ORDER BY tr.created_at DESC
+      LIMIT 20
+    `;
+    const avg = rows.length > 0 ? rows.reduce((s: number, r: any) => s + r.rating, 0) / rows.length : null;
+    res.json({ average: avg ? Math.round(avg * 10) / 10 : null, count: rows.length });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
+  }
+});
+
+// POST /api/trainer/:id/review — student submits/updates a review
+app.post('/api/trainer/:id/review', authenticateToken, async (req: any, res: any) => {
+  if (req.user.role !== 'student') return res.status(403).json({ error: 'error_forbidden' });
+  const { rating, comment } = req.body;
+  if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'error_missing_fields' });
+  try {
+    const sql = getDb();
+    await sql`
+      INSERT INTO trainer_reviews (trainer_id, student_id, rating, comment)
+      VALUES (${req.params.id}, ${req.user.userId}, ${rating}, ${comment ?? ''})
+      ON CONFLICT (trainer_id, student_id) DO UPDATE SET rating = ${rating}, comment = ${comment ?? ''}
+    `;
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'error_internal' });
   }
 });
 
