@@ -19,6 +19,7 @@ interface Student {
 interface AnalysisNotesProps {
   lang: 'tr' | 'en';
   role?: 'trainer' | 'student';
+  embedded?: boolean;
 }
 
 const categoryConfig = {
@@ -45,7 +46,7 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('fittrack_token')}`,
 });
 
-const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'student' }) => {
+const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'student', embedded = false }) => {
   const isTrainer = role === 'trainer';
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -130,8 +131,9 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
   ];
 
   return (
-    <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
-      {/* Header */}
+    <div className={embedded ? '' : 'min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64'}>
+      {/* Header — hidden when embedded */}
+      {!embedded && (
       <div className="sticky top-0 z-40 bg-background-dark/90 backdrop-blur-xl border-b border-white/5 px-4 pt-12 pb-3">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <h1 className="text-xl font-black text-white">
@@ -165,6 +167,44 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
           </div>
         )}
       </div>
+      )}
+
+      {/* Embedded toolbar — add button + filter pills */}
+      {embedded && (
+        <div className="px-4 pt-3 pb-2 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+              {lang === 'tr' ? 'Analiz Notları' : 'Analysis Notes'}
+            </p>
+            {isTrainer && selectedStudentId && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-black active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                {lang === 'tr' ? 'Not Ekle' : 'Add Note'}
+              </button>
+            )}
+          </div>
+          {(!isTrainer || selectedStudentId) && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {filterPills.map(pill => (
+                <button
+                  key={pill.key}
+                  onClick={() => setActiveFilter(pill.key)}
+                  className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
+                    activeFilter === pill.key
+                      ? 'bg-primary text-white'
+                      : 'bg-white/5 text-white/50 hover:bg-white/10'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="px-4 py-4 max-w-2xl mx-auto flex flex-col gap-3">
 
@@ -272,7 +312,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
         )}
       </div>
 
-      <BottomNav role={role} lang={lang} />
+      {!embedded && <BottomNav role={role} lang={lang} />}
 
       {/* Add Note Modal */}
       {showAddModal && selectedStudent && (

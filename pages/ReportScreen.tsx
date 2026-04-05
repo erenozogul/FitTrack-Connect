@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
+import AnalysisNotesScreen from './AnalysisNotesScreen';
 
 interface ReportScreenProps {
   lang: 'tr' | 'en';
@@ -56,6 +57,7 @@ const BarChart: React.FC<{ data: { label: string; value: number; secondary?: num
 
 const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
   const navigate = useNavigate();
+  const [mainTab, setMainTab] = useState<'report' | 'notes'>('report');
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const [report, setReport] = useState<Report>(null);
   const [loading, setLoading] = useState(false);
@@ -78,7 +80,7 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
   return (
     <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
       <div className="sticky top-0 z-40 bg-background-dark/90 backdrop-blur-xl border-b border-white/5 px-4 pt-12 pb-4">
-        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto mb-3">
           <button onClick={() => navigate('/dashboard')} className="bg-white/5 rounded-xl p-2.5 hover:bg-white/10 transition-colors active:scale-95">
             <span className="material-symbols-outlined text-white text-xl">arrow_back</span>
           </button>
@@ -92,9 +94,29 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
             </div>
           </div>
         </div>
+        {/* Main tab selector */}
+        <div className="flex gap-2 bg-white/5 rounded-xl p-1 max-w-2xl mx-auto">
+          {(['report', 'notes'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setMainTab(t)}
+              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${mainTab === t ? 'bg-primary text-white' : 'text-white/40 hover:text-white/70'}`}
+            >
+              <span className="material-symbols-outlined text-sm">{t === 'report' ? 'bar_chart' : 'edit_note'}</span>
+              {t === 'report' ? (lang === 'tr' ? 'Rapor' : 'Report') : (lang === 'tr' ? 'Notlar' : 'Notes')}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <main className="p-4 max-w-2xl mx-auto space-y-4">
+      {/* Notes tab — render AnalysisNotesScreen without its own header/nav */}
+      {mainTab === 'notes' && (
+        <div className="pb-32 md:pb-0 md:pl-0">
+          <AnalysisNotesScreen lang={lang} role={role} embedded />
+        </div>
+      )}
+
+      <main className={`p-4 max-w-2xl mx-auto space-y-4 ${mainTab === 'notes' ? 'hidden' : ''}`}>
         {/* Period selector */}
         <div className="flex gap-2 bg-card-dark border border-white/5 rounded-xl p-1">
           {(['week', 'month'] as const).map(p => (

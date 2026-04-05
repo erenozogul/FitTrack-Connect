@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 
 interface TrainerAnalyticsScreenProps {
@@ -62,6 +62,13 @@ const TrainerAnalyticsScreen: React.FC<TrainerAnalyticsScreenProps> = ({ lang })
       </div>
 
       <div className="px-4 py-6 max-w-2xl mx-auto space-y-6">
+        <Link to="/report" className="flex items-center justify-between bg-card-dark border border-primary/20 rounded-2xl px-4 py-3.5 hover:border-primary/40 transition-colors">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-xl">summarize</span>
+            <span className="text-white text-sm font-bold">{lang === 'tr' ? 'Haftalık / Aylık Rapor' : 'Weekly / Monthly Report'}</span>
+          </div>
+          <span className="material-symbols-outlined text-white/20">chevron_right</span>
+        </Link>
         {loading && (
           <div className="flex justify-center py-16">
             <span className="material-symbols-outlined text-white/20 text-4xl animate-spin">progress_activity</span>
