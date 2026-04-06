@@ -782,27 +782,26 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
     }
 
     // Fetch exercises from dedicated table for all assignments in one query
-    const assignmentIds = rows.map((r: any) => r.id);
-    let exerciseRows: any[] = [];
-    if (assignmentIds.length > 0) {
-      exerciseRows = await sql`
-        SELECT assignment_id, exercise_id, exercise_name, target_tr, target_en, sort_order
-        FROM assignment_exercises
-        WHERE assignment_id = ANY(${assignmentIds})
-        ORDER BY assignment_id, sort_order
-      `;
-    }
-
-    // Group exercises by assignment_id
+    // Fetch exercises per assignment — avoid ANY($array) which Neon HTTP driver handles inconsistently
     const exercisesByAssignment: Record<number, any[]> = {};
-    for (const ex of exerciseRows) {
-      const aid = ex.assignment_id;
-      if (!exercisesByAssignment[aid]) exercisesByAssignment[aid] = [];
-      exercisesByAssignment[aid].push({
-        id: ex.exercise_id,
-        name: ex.exercise_name,
-        target: { tr: ex.target_tr, en: ex.target_en },
-      });
+    try {
+      for (const row of rows) {
+        const exRows = await sql`
+          SELECT exercise_id, exercise_name, target_tr, target_en
+          FROM assignment_exercises
+          WHERE assignment_id = ${row.id}
+          ORDER BY sort_order
+        `;
+        if (exRows.length > 0) {
+          exercisesByAssignment[row.id] = exRows.map((ex: any) => ({
+            id: ex.exercise_id,
+            name: ex.exercise_name,
+            target: { tr: ex.target_tr, en: ex.target_en },
+          }));
+        }
+      }
+    } catch (_) {
+      // assignment_exercises table may not exist yet — return empty exercises gracefully
     }
 
     res.json(rows.map((r: any) => ({
