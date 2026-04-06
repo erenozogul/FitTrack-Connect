@@ -30,10 +30,17 @@ interface StudentReport {
 
 type Report = TrainerReport | StudentReport | null;
 
-const apiHeaders = () => {
-  const token = localStorage.getItem('fittrack_token');
-  return { Authorization: `Bearer ${token}` };
-};
+interface Student {
+  id: number;
+  name: string;
+  username: string;
+  avatar: string;
+}
+
+const apiHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('fittrack_token')}`,
+});
 
 // Mini bar chart using div widths
 const BarChart: React.FC<{ data: { label: string; value: number; secondary?: number }[]; color?: string }> = ({ data, color = 'bg-primary' }) => {
@@ -57,10 +64,20 @@ const BarChart: React.FC<{ data: { label: string; value: number; secondary?: num
 
 const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
   const navigate = useNavigate();
+  const isTrainer = role === 'trainer';
+
   const [mainTab, setMainTab] = useState<'report' | 'notes'>('report');
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const [report, setReport] = useState<Report>(null);
   const [loading, setLoading] = useState(false);
+
+  // "Rapor Yaz" modal state
+  const [showWriteModal, setShowWriteModal] = useState(false);
+  const [writeStudents, setWriteStudents] = useState<Student[]>([]);
+  const [writeStudentId, setWriteStudentId] = useState<number | null>(null);
+  const [writeStudentDropdown, setWriteStudentDropdown] = useState(false);
+  const [writeContent, setWriteContent] = useState('');
+  const [writeSaving, setWriteSaving] = useState(false);
 
   const fetchReport = async (p: 'week' | 'month') => {
     setLoading(true);
@@ -73,9 +90,49 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
 
   useEffect(() => { fetchReport(period); }, [period]);
 
+  // Load students for trainer's "Rapor Yaz" modal
+  useEffect(() => {
+    if (!isTrainer) return;
+    fetch('/api/trainer/students', { headers: apiHeaders() })
+      .then(r => r.ok ? r.json() : [])
+      .then(setWriteStudents)
+      .catch(() => {});
+  }, [isTrainer]);
+
+  const openWriteModal = () => {
+    setWriteStudentId(null);
+    setWriteContent('');
+    setWriteStudentDropdown(false);
+    setShowWriteModal(true);
+  };
+
+  const closeWriteModal = () => {
+    setShowWriteModal(false);
+    setWriteStudentId(null);
+    setWriteContent('');
+    setWriteStudentDropdown(false);
+  };
+
+  const handleSaveReport = async () => {
+    if (!writeContent.trim()) return;
+    if (isTrainer && !writeStudentId) return;
+    setWriteSaving(true);
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: apiHeaders(),
+        body: JSON.stringify({ studentId: writeStudentId, content: writeContent.trim(), category: 'general' }),
+      });
+      if (res.ok) closeWriteModal();
+    } catch {}
+    setWriteSaving(false);
+  };
+
   const completionRate = report
     ? report.totalSessions > 0 ? Math.round((report.completedSessions / report.totalSessions) * 100) : 0
     : 0;
+
+  const writeStudent = writeStudents.find(s => s.id === writeStudentId);
 
   return (
     <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
@@ -93,6 +150,16 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
               <p className="text-xs text-white/40">{lang === 'tr' ? 'Özet & istatistikler' : 'Summary & stats'}</p>
             </div>
           </div>
+          {/* "Rapor Yaz" button — only for trainer on report tab */}
+          {isTrainer && mainTab === 'report' && (
+            <button
+              onClick={openWriteModal}
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-xs font-black active:scale-95 transition-all shadow-lg shadow-primary/20"
+            >
+              <span className="material-symbols-outlined text-sm">edit_note</span>
+              {lang === 'tr' ? 'Rapor Yaz' : 'Write Report'}
+            </button>
+          )}
         </div>
         {/* Main tab selector */}
         <div className="flex gap-2 bg-white/5 rounded-xl p-1 max-w-2xl mx-auto">
@@ -247,6 +314,82 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ lang, role }) => {
       </main>
 
       <BottomNav role={role} lang={lang} />
+
+      {/* Write Report Modal (Trainer only) */}
+      {showWriteModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={closeWriteModal}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-black text-white">{lang === 'tr' ? 'Rapor Yaz' : 'Write Report'}</h2>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {writeStudent?.name ?? (lang === 'tr' ? 'Öğrenci seçin' : 'Select a student')}
+                </p>
+              </div>
+              <button onClick={closeWriteModal} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Student picker */}
+            <div className="relative">
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Öğrenci' : 'Student'}</p>
+              <button
+                type="button"
+                onClick={() => setWriteStudentDropdown(v => !v)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/60 flex items-center justify-between"
+              >
+                {writeStudent ? (
+                  <span className="flex items-center gap-2 text-white">
+                    <img src={writeStudent.avatar} className="size-6 rounded-full object-cover" />
+                    {writeStudent.name}
+                  </span>
+                ) : (
+                  <span className="text-white/30">{lang === 'tr' ? 'Öğrenci seçin...' : 'Select student...'}</span>
+                )}
+                <span className="material-symbols-outlined text-white/50 text-base">{writeStudentDropdown ? 'expand_less' : 'expand_more'}</span>
+              </button>
+              {writeStudentDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl max-h-48 overflow-y-auto">
+                  {writeStudents.length === 0 ? (
+                    <p className="px-4 py-3 text-xs text-white/30">{lang === 'tr' ? 'Öğrenci bulunamadı' : 'No students found'}</p>
+                  ) : writeStudents.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { setWriteStudentId(s.id); setWriteStudentDropdown(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${writeStudentId === s.id ? 'bg-primary text-white' : 'text-white hover:bg-white/10'}`}
+                    >
+                      <img src={s.avatar} className="size-7 rounded-full object-cover" />
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Rapor İçeriği' : 'Report Content'}</p>
+              <textarea
+                value={writeContent}
+                onChange={e => setWriteContent(e.target.value)}
+                placeholder={lang === 'tr' ? 'Öğrenci için rapor yazın...' : 'Write a report for the student...'}
+                rows={5}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/30 focus:outline-none focus:border-primary/60 resize-none"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveReport}
+              disabled={writeSaving || !writeContent.trim() || !writeStudentId}
+              className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined">{writeSaving ? 'hourglass_empty' : 'save'}</span>
+              {lang === 'tr' ? 'Raporu Kaydet' : 'Save Report'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

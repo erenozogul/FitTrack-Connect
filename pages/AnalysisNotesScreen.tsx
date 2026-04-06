@@ -56,10 +56,30 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
 
   const [activeFilter, setActiveFilter] = useState<'all' | Note['category']>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [modalStudentId, setModalStudentId] = useState<number | null>(null);
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState<Note['category']>('general');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const openAddModal = () => {
+    setModalStudentId(selectedStudentId);
+    setNewContent('');
+    setNewCategory('general');
+    setShowCategoryDropdown(false);
+    setShowStudentDropdown(false);
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setModalStudentId(null);
+    setNewContent('');
+    setNewCategory('general');
+    setShowCategoryDropdown(false);
+    setShowStudentDropdown(false);
+  };
 
   // Load students (trainer) or own notes (student)
   useEffect(() => {
@@ -93,20 +113,23 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
   };
 
   const handleAddNote = async () => {
-    if (!newContent.trim() || !selectedStudentId) return;
+    const sid = isTrainer ? modalStudentId : undefined;
+    if (!newContent.trim()) return;
+    if (isTrainer && !sid) return;
     setSaving(true);
     try {
       const res = await fetch('/api/notes', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ studentId: selectedStudentId, content: newContent.trim(), category: newCategory }),
+        body: JSON.stringify({ studentId: sid, content: newContent.trim(), category: newCategory }),
       });
       if (res.ok) {
         const created = await res.json();
-        setNotes(prev => [created, ...prev]);
-        setNewContent('');
-        setNewCategory('general');
-        setShowAddModal(false);
+        // Add to visible list only if this student's notes are open
+        if (!isTrainer || selectedStudentId === sid) {
+          setNotes(prev => [created, ...prev]);
+        }
+        closeAddModal();
       }
     } catch { /* ignore */ }
     setSaving(false);
@@ -120,7 +143,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
   };
 
   const filteredNotes = activeFilter === 'all' ? notes : notes.filter(n => n.category === activeFilter);
-  const selectedStudent = students.find(s => s.id === selectedStudentId);
+  const modalStudent = students.find(s => s.id === modalStudentId);
 
   const filterPills: { key: 'all' | Note['category']; label: string }[] = [
     { key: 'all',       label: lang === 'tr' ? 'Tümü'     : 'All'       },
@@ -139,9 +162,9 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
           <h1 className="text-xl font-black text-white">
             {lang === 'tr' ? 'Analiz Notları' : 'Analysis Notes'}
           </h1>
-          {isTrainer && selectedStudentId && (
+          {isTrainer && (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={openAddModal}
               className="size-10 bg-primary rounded-xl flex items-center justify-center text-white hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
             >
               <span className="material-symbols-outlined text-xl">add</span>
@@ -176,9 +199,9 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
               {lang === 'tr' ? 'Analiz Notları' : 'Analysis Notes'}
             </p>
-            {isTrainer && selectedStudentId && (
+            {isTrainer && (
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={openAddModal}
                 className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-black active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
@@ -315,18 +338,52 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
       {!embedded && <BottomNav role={role} lang={lang} />}
 
       {/* Add Note Modal */}
-      {showAddModal && selectedStudent && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowAddModal(false)}>
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={closeAddModal}>
           <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black text-white">{lang === 'tr' ? 'Not Ekle' : 'Add Note'}</h2>
-                <p className="text-xs text-white/40 mt-0.5">{selectedStudent.name}</p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  {isTrainer ? (modalStudent?.name ?? (lang === 'tr' ? 'Öğrenci seçin' : 'Select student')) : ''}
+                </p>
               </div>
-              <button onClick={() => setShowAddModal(false)} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
+              <button onClick={closeAddModal} className="size-8 bg-white/5 rounded-full flex items-center justify-center text-white/50 hover:bg-white/10">
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
+
+            {/* Student picker — shown for trainer when no student pre-selected */}
+            {isTrainer && (
+              <div className="relative">
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Öğrenci' : 'Student'}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowStudentDropdown(v => !v)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/60 flex items-center justify-between"
+                >
+                  <span className={modalStudent ? 'text-white' : 'text-white/30'}>
+                    {modalStudent?.name ?? (lang === 'tr' ? 'Öğrenci seçin...' : 'Select student...')}
+                  </span>
+                  <span className="material-symbols-outlined text-white/50 text-base">{showStudentDropdown ? 'expand_less' : 'expand_more'}</span>
+                </button>
+                {showStudentDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden shadow-xl max-h-48 overflow-y-auto">
+                    {students.map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { setModalStudentId(s.id); setShowStudentDropdown(false); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${modalStudentId === s.id ? 'bg-primary text-white' : 'text-white hover:bg-white/10'}`}
+                      >
+                        <img src={s.avatar} className="size-7 rounded-full object-cover" />
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="relative">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Kategori' : 'Category'}</p>
@@ -367,7 +424,7 @@ const AnalysisNotesScreen: React.FC<AnalysisNotesProps> = ({ lang, role = 'stude
 
             <button
               onClick={handleAddNote}
-              disabled={saving || !newContent.trim()}
+              disabled={saving || !newContent.trim() || (isTrainer && !modalStudentId)}
               className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
             >
               <span className="material-symbols-outlined">{saving ? 'hourglass_empty' : 'save'}</span>
