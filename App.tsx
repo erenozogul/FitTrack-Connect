@@ -335,7 +335,7 @@ const App: React.FC = () => {
             path="/signup" 
             element={<SignUpScreen role={role} onSignUp={(name) => handleAuthSuccess(name)} lang={lang} />} 
           />
-          <Route path="/plans" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><PlansScreen lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
+          <Route path="/plans" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}>{role === 'trainer' ? <PlansScreen lang={lang} role="trainer" /> : <Navigate to="/profile" replace />}</ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><TemplateLibrary onLogout={handleLogout} lang={lang} userName={userName} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
           <Route path="/live" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><LiveSession lang={lang} role={role as 'trainer' | 'student'} /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute isLoggedIn={isLoggedIn} isLoading={isAuthLoading}><StudentDashboard onLogout={handleLogout} lang={lang} role={role as 'trainer' | 'student'} userName={userName} /></ProtectedRoute>} />
