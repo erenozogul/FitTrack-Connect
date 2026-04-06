@@ -1196,7 +1196,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                 </button>
                 {isTrainer && (
                   <button
-                    onClick={() => { setAssignTarget(bp); setAssignSuccess(false); setSelectedExerciseIds(bp.exercises.map(e => e.id)); }}
+                    onClick={() => { setAssignTarget(bp); setAssignSuccess(false); setSelectedExerciseIds([]); }}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 border-t border-white/10 text-xs font-black text-white/60 hover:text-white hover:bg-white/5 transition-colors"
                   >
                     <span className="material-symbols-outlined text-sm">person_add</span>
@@ -1466,7 +1466,14 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                 {assignTarget.exercises.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Hareketler' : 'Exercises'}</p>
+                      <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Hareketler' : 'Exercises'}</p>
+                        <p className="text-[9px] text-white/25 mt-0.5">
+                          {selectedExerciseIds.length === 0
+                            ? (lang === 'tr' ? 'Eklemek istediklerinizi seçin' : 'Select exercises to include')
+                            : `${selectedExerciseIds.length} ${lang === 'tr' ? 'hareket seçildi' : 'selected'}`}
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
