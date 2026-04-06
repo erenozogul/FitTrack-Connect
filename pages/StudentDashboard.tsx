@@ -559,8 +559,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <div className="flex flex-col gap-2">
               {(assignments[selectedDay] || []).map((a: any, idx: number) => {
                 const isExpanded = expandedAssignmentId === (a.id ?? idx);
-                const storedExercises: { name: string; target: { tr: string; en: string } }[] = Array.isArray(a.exercises) && a.exercises.length > 0 ? a.exercises : [];
-                const exercises = storedExercises.length > 0 ? storedExercises : (a.workoutId ? (fallbackExercises[a.workoutId] || []) : []);
+                // exercises come directly from assignment_exercises table — no fallback needed
+                const exercises: { name: string; target: { tr: string; en: string } }[] = Array.isArray(a.exercises) ? a.exercises : [];
                 return (
                   <div key={a.id ?? idx} className={`rounded-xl border transition-all ${a.completed ? 'bg-green-500/10 border-green-500/20' : 'bg-card-dark border-white/5'}`}>
                     {/* Main row */}

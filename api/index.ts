@@ -246,6 +246,19 @@ try {
       `;
     }).then(() => {
       return sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_plan VARCHAR(20) DEFAULT 'free'`;
+    }).then(() => {
+      // Dedicated exercises table — no JSON, no casting, no column type issues
+      return sql`
+        CREATE TABLE IF NOT EXISTS assignment_exercises (
+          id SERIAL PRIMARY KEY,
+          assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
+          exercise_id VARCHAR(100) NOT NULL,
+          exercise_name VARCHAR(255) NOT NULL,
+          target_tr TEXT DEFAULT '',
+          target_en TEXT DEFAULT '',
+          sort_order INTEGER DEFAULT 0
+        )
+      `;
     }).then(() => console.log("Database tables verified"))
      .catch(err => console.error("Failed to initialize database tables:", err));
   }
@@ -713,14 +726,26 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
     }
 
     const exercisesArr = Array.isArray(exercises) ? exercises : [];
-    // exercise_list is a fresh TEXT column (never JSONB) — reliable plain JSON storage
-    const exerciseListJson = JSON.stringify(exercisesArr);
+
+    // Insert the assignment
     const result = await sql`
-      INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time, exercise_list)
-      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null}, ${exerciseListJson})
+      INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time)
+      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null})
       RETURNING *
     `;
     const row = result[0];
+
+    // Insert exercises into dedicated table — no JSON, no type casting
+    if (exercisesArr.length > 0) {
+      for (let i = 0; i < exercisesArr.length; i++) {
+        const ex = exercisesArr[i];
+        await sql`
+          INSERT INTO assignment_exercises (assignment_id, exercise_id, exercise_name, target_tr, target_en, sort_order)
+          VALUES (${row.id}, ${ex.id || ''}, ${ex.name || ''}, ${ex.target?.tr || ''}, ${ex.target?.en || ''}, ${i})
+        `;
+      }
+    }
+
     res.status(201).json({
       id: row.id,
       studentId: row.student_id,
@@ -730,7 +755,7 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
       assignedDate: dateToStr(row.assigned_date),
       startTime: row.start_time,
       endTime: row.end_time,
-      exercises: parseExercises(row.exercise_list),
+      exercises: exercisesArr,
     });
   } catch (error) {
     console.error("Create assignment error:", error);
@@ -755,6 +780,31 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
         ? await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} AND assigned_date = ${date}::date ORDER BY start_time`
         : await sql`SELECT * FROM assignments WHERE student_id = ${req.user.userId} ORDER BY assigned_date DESC, start_time LIMIT ${limit} OFFSET ${offset}`;
     }
+
+    // Fetch exercises from dedicated table for all assignments in one query
+    const assignmentIds = rows.map((r: any) => r.id);
+    let exerciseRows: any[] = [];
+    if (assignmentIds.length > 0) {
+      exerciseRows = await sql`
+        SELECT assignment_id, exercise_id, exercise_name, target_tr, target_en, sort_order
+        FROM assignment_exercises
+        WHERE assignment_id = ANY(${assignmentIds})
+        ORDER BY assignment_id, sort_order
+      `;
+    }
+
+    // Group exercises by assignment_id
+    const exercisesByAssignment: Record<number, any[]> = {};
+    for (const ex of exerciseRows) {
+      const aid = ex.assignment_id;
+      if (!exercisesByAssignment[aid]) exercisesByAssignment[aid] = [];
+      exercisesByAssignment[aid].push({
+        id: ex.exercise_id,
+        name: ex.exercise_name,
+        target: { tr: ex.target_tr, en: ex.target_en },
+      });
+    }
+
     res.json(rows.map((r: any) => ({
       id: r.id,
       studentId: r.student_id,
@@ -765,8 +815,7 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       startTime: r.start_time,
       endTime: r.end_time,
       completed: r.completed ?? false,
-      // Read from exercise_list (fresh TEXT column); fall back to old exercises column for legacy rows
-      exercises: (() => { const a = parseExercises(r.exercise_list); return a.length > 0 ? a : parseExercises(r.exercises); })(),
+      exercises: exercisesByAssignment[r.id] || [],
     })));
   } catch (error) {
     res.status(500).json({ error: "error_internal" });
