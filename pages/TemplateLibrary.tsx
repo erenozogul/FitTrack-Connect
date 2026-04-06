@@ -989,6 +989,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [recurringWeeks, setRecurringWeeks] = useState(4);
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isTrainer) return;
@@ -1089,6 +1090,9 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
           assignedDate: date,
           startTime: assignStartTime,
           endTime: assignEndTime,
+          exercises: (assignTarget.exercises || [])
+            .filter(e => selectedExerciseIds.includes(e.id))
+            .map(e => ({ id: e.id, name: e.name, target: e.target })),
         });
       }
     } catch (err: any) {
@@ -1107,7 +1111,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
         : `${student.name} → ${assignTarget.name[lang]} • ${assignDate} ${assignStartTime}-${assignEndTime}`,
     });
     setAssignSuccess(true);
-    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); setAssignError(null); setRecurringEnabled(false); setRecurringDays([]); }, 1200);
+    setTimeout(() => { setAssignSuccess(false); setAssignTarget(null); setAssignError(null); setRecurringEnabled(false); setRecurringDays([]); setSelectedExerciseIds([]); }, 1200);
   };
 
   const handleLogoutClick = () => { onLogout(); window.location.hash = '#/'; };
@@ -1192,7 +1196,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                 </button>
                 {isTrainer && (
                   <button
-                    onClick={() => { setAssignTarget(bp); setAssignSuccess(false); }}
+                    onClick={() => { setAssignTarget(bp); setAssignSuccess(false); setSelectedExerciseIds(bp.exercises.map(e => e.id)); }}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 border-t border-white/10 text-xs font-black text-white/60 hover:text-white hover:bg-white/5 transition-colors"
                   >
                     <span className="material-symbols-outlined text-sm">person_add</span>
@@ -1458,6 +1462,60 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                   )}
                 </div>
 
+                {/* Exercise selection */}
+                {assignTarget.exercises.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Hareketler' : 'Exercises'}</p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedExerciseIds(
+                            selectedExerciseIds.length === assignTarget.exercises.length
+                              ? []
+                              : assignTarget.exercises.map(e => e.id)
+                          )
+                        }
+                        className="text-[10px] font-black text-primary/70 hover:text-primary uppercase tracking-widest"
+                      >
+                        {selectedExerciseIds.length === assignTarget.exercises.length
+                          ? (lang === 'tr' ? 'Tümünü Kaldır' : 'Deselect All')
+                          : (lang === 'tr' ? 'Tümünü Seç' : 'Select All')}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {assignTarget.exercises.map(ex => {
+                        const checked = selectedExerciseIds.includes(ex.id);
+                        return (
+                          <button
+                            key={ex.id}
+                            type="button"
+                            onClick={() =>
+                              setSelectedExerciseIds(prev =>
+                                checked ? prev.filter(id => id !== ex.id) : [...prev, ex.id]
+                              )
+                            }
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all active:scale-[0.99] text-left ${
+                              checked ? 'bg-primary/10 border-primary/30' : 'bg-white/3 border-white/5 hover:bg-white/5'
+                            }`}
+                          >
+                            <div className={`size-5 rounded-md flex items-center justify-center flex-shrink-0 border transition-colors ${checked ? 'bg-primary border-primary' : 'border-white/20'}`}>
+                              {checked && <span className="material-symbols-outlined text-white text-xs">check</span>}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold ${checked ? 'text-white' : 'text-white/60'}`}>{ex.name}</p>
+                              <p className="text-[10px] text-white/30 truncate">{ex.target[lang]}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedExerciseIds.length === 0 && (
+                      <p className="text-[10px] text-red-400/70 mt-1">{lang === 'tr' ? 'En az 1 hareket seçmelisiniz.' : 'Select at least 1 exercise.'}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Date picker */}
                 <div>
                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">{lang === 'tr' ? 'Tarih' : 'Date'}</p>
@@ -1557,7 +1615,8 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
 
                 <button
                   onClick={handleAssign}
-                  className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all"
+                  disabled={selectedExerciseIds.length === 0}
+                  className="w-full bg-primary text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined">event_available</span>
                   {lang === 'tr' ? 'Ata' : 'Assign'}

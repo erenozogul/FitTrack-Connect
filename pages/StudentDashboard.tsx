@@ -23,44 +23,6 @@ interface DaySchedule {
   level: { tr: string; en: string };
 }
 
-// Static exercise lookup by workoutId
-const workoutExercises: Record<string, { name: string; target: { tr: string; en: string } }[]> = {
-  chest: [
-    { name: 'Dumbbell Fly',  target: { tr: 'Göğüs (Pektoral)', en: 'Chest (Pectoral)' } },
-    { name: 'Bench Press',   target: { tr: 'Göğüs, Triceps, Ön Omuz', en: 'Chest, Triceps, Front Shoulder' } },
-    { name: 'Push-Up',       target: { tr: 'Göğüs, Triceps, Core', en: 'Chest, Triceps, Core' } },
-  ],
-  legs: [
-    { name: 'Squat',              target: { tr: 'Quadriceps, Hamstring, Glute', en: 'Quadriceps, Hamstrings, Glutes' } },
-    { name: 'Romanian Deadlift',  target: { tr: 'Hamstring, Glute, Bel', en: 'Hamstrings, Glutes, Lower Back' } },
-    { name: 'Lunge',              target: { tr: 'Quadriceps, Glute, Denge', en: 'Quadriceps, Glutes, Balance' } },
-  ],
-  shoulders: [
-    { name: 'Lateral Raise',   target: { tr: 'Deltoid (Yan)', en: 'Lateral Deltoid' } },
-    { name: 'Shoulder Press',  target: { tr: 'Deltoid (Ön/Yan), Triceps', en: 'Front/Lateral Deltoid, Triceps' } },
-    { name: 'Face Pull',       target: { tr: 'Arka Deltoid, Rotator Cuff', en: 'Rear Deltoid, Rotator Cuff' } },
-  ],
-  arms: [
-    { name: 'Bicep Curl',   target: { tr: 'Biceps Brachii', en: 'Biceps Brachii' } },
-    { name: 'Tricep Dip',   target: { tr: 'Triceps Brachii', en: 'Triceps Brachii' } },
-    { name: 'Hammer Curl',  target: { tr: 'Brachialis, Ön Kol', en: 'Brachialis, Forearm' } },
-  ],
-  back: [
-    { name: 'Lat Pulldown',    target: { tr: 'Latissimus Dorsi, Biceps', en: 'Latissimus Dorsi, Biceps' } },
-    { name: 'Bent-Over Row',   target: { tr: 'Orta Sırt, Rhomboid, Biceps', en: 'Mid Back, Rhomboids, Biceps' } },
-    { name: 'Deadlift',        target: { tr: 'Tüm Arka Zincir', en: 'Full Posterior Chain' } },
-  ],
-  cardio: [
-    { name: 'Jump Rope',     target: { tr: 'Kalp-Damar, Koordinasyon', en: 'Cardiovascular, Coordination' } },
-    { name: 'Jumping Jacks', target: { tr: 'Tüm Vücut, Kardiyo', en: 'Full Body, Cardio' } },
-    { name: 'Burpee',        target: { tr: 'Tüm Vücut, HIIT', en: 'Full Body, HIIT' } },
-  ],
-  calisthenics: [
-    { name: 'Pull-Up',    target: { tr: 'Lat, Biceps, Üst Sırt', en: 'Lats, Biceps, Upper Back' } },
-    { name: 'Muscle-Up',  target: { tr: 'Tüm Üst Vücut', en: 'Full Upper Body' } },
-    { name: 'Plank',      target: { tr: 'Core, Omuz Stabilitesi', en: 'Core, Shoulder Stability' } },
-  ],
-};
 
 const weekSchedule: Record<number, DaySchedule> = {
   16: {
@@ -244,7 +206,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
         data.forEach(a => {
           const key = toLocalDate(String(a.assignedDate));
           if (!grouped[key]) grouped[key] = [];
-          grouped[key].push({ id: a.id, studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime, completed: a.completed ?? false });
+          grouped[key].push({ id: a.id, studentId: a.studentId, studentName: a.studentName, workoutId: a.workoutId, workoutName: a.workoutName, startTime: a.startTime, endTime: a.endTime, completed: a.completed ?? false, exercises: a.exercises || [] });
         });
         localStorage.setItem('fittrack_assignments', JSON.stringify(grouped));
         setAssignments(grouped);
@@ -586,7 +548,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
             <div className="flex flex-col gap-2">
               {(assignments[selectedDay] || []).map((a: any, idx: number) => {
                 const isExpanded = expandedAssignmentId === (a.id ?? idx);
-                const exercises = a.workoutId ? (workoutExercises[a.workoutId] || []) : [];
+                const exercises: { name: string; target: { tr: string; en: string } }[] = Array.isArray(a.exercises) ? a.exercises : [];
                 return (
                   <div key={a.id ?? idx} className={`rounded-xl border transition-all ${a.completed ? 'bg-green-500/10 border-green-500/20' : 'bg-card-dark border-white/5'}`}>
                     {/* Main row */}
