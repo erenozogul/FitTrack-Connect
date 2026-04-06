@@ -660,6 +660,18 @@ app.get('/api/users/trainer/:username', authenticateToken, async (req: any, res:
   }
 });
 
+// Helper: parse exercises field — handles both TEXT column (string) and JSONB column (already-parsed array)
+// When the DB column is JSONB, Neon returns an already-parsed JS array; JSON.parse on an array throws.
+// When the DB column is TEXT, Neon returns a string; we need JSON.parse.
+const parseExercises = (val: any): any[] => {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object') return [];
+  if (typeof val === 'string' && val.trim().startsWith('[')) {
+    try { return JSON.parse(val); } catch { return []; }
+  }
+  return [];
+};
+
 // Helper: convert Neon DATE (JS Date object, UTC midnight) to "YYYY-MM-DD" using local date parts
 const dateToStr = (d: any): string => {
   if (!d) return '';
@@ -693,14 +705,14 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
       }
     }
 
-    const exercisesJson = JSON.stringify(Array.isArray(exercises) ? exercises : []);
+    const exercisesArr = Array.isArray(exercises) ? exercises : [];
+    const exercisesJson = JSON.stringify(exercisesArr);
     const result = await sql`
       INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time, exercises)
       VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null}, ${exercisesJson})
       RETURNING *
     `;
     const row = result[0];
-    const parsedExercises = (() => { try { return JSON.parse(row.exercises || '[]'); } catch { return []; } })();
     res.status(201).json({
       id: row.id,
       studentId: row.student_id,
@@ -710,7 +722,7 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
       assignedDate: dateToStr(row.assigned_date),
       startTime: row.start_time,
       endTime: row.end_time,
-      exercises: parsedExercises,
+      exercises: parseExercises(row.exercises),
     });
   } catch (error) {
     console.error("Create assignment error:", error);
@@ -745,7 +757,7 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       startTime: r.start_time,
       endTime: r.end_time,
       completed: r.completed ?? false,
-      exercises: (() => { try { return JSON.parse(r.exercises || '[]'); } catch { return []; } })(),
+      exercises: parseExercises(r.exercises),
     })));
   } catch (error) {
     res.status(500).json({ error: "error_internal" });
