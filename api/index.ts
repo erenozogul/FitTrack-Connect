@@ -152,7 +152,9 @@ try {
     }).then(() => {
       return sql`
         ALTER TABLE assignments ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false;
-      `.then(() => sql`
+      `;
+    }).then(() => {
+      return sql`
         ALTER TABLE assignments ADD COLUMN IF NOT EXISTS exercises JSONB DEFAULT '[]'::jsonb;
       `;
     }).then(() => {
