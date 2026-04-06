@@ -1,121 +1,275 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
+import { PLANS, PlanTier, getPlanDef, fetchActivePlan } from '../utils/plan';
 
 interface PlansScreenProps {
   lang: 'tr' | 'en';
   role?: 'trainer' | 'student';
 }
 
+const planBorderColor: Record<PlanTier, string> = {
+  free: 'border-white/10',
+  bronze: 'border-amber-600/40',
+  silver: 'border-slate-400/40',
+  gold: 'border-yellow-400/40',
+};
+const planBgGlow: Record<PlanTier, string> = {
+  free: '',
+  bronze: 'shadow-amber-600/10',
+  silver: 'shadow-slate-400/10',
+  gold: 'shadow-yellow-400/20',
+};
+const planGradient: Record<PlanTier, string> = {
+  free: 'from-slate-500/10 to-transparent',
+  bronze: 'from-amber-600/15 to-transparent',
+  silver: 'from-slate-400/15 to-transparent',
+  gold: 'from-yellow-400/20 to-transparent',
+};
+const planTextColor: Record<PlanTier, string> = {
+  free: 'text-slate-400',
+  bronze: 'text-amber-500',
+  silver: 'text-slate-300',
+  gold: 'text-yellow-400',
+};
+const tierOrder: Record<PlanTier, number> = { free: 0, bronze: 1, silver: 2, gold: 3 };
+
 const PlansScreen: React.FC<PlansScreenProps> = ({ lang, role = 'trainer' }) => {
   const navigate = useNavigate();
+  const [activePlan, setActivePlan] = useState<PlanTier>('free');
+  const [loading, setLoading] = useState(true);
+  const [upgrading, setUpgrading] = useState<PlanTier | null>(null);
+  const [confirmPlan, setConfirmPlan] = useState<PlanTier | null>(null);
+  const [successPlan, setSuccessPlan] = useState<PlanTier | null>(null);
 
-  const plans = [
-    {
-      name: 'Bronze',
-      price: '249 TL',
-      capacity: '6 Students',
-      progress: '25%',
-      features: ['Core Management Tools', 'Student Progress Tracking', 'Standard Support'],
-      cta: lang === 'tr' ? 'Bronze Seç' : 'Choose Bronze'
-    },
-    {
-      name: 'Silver',
-      price: '249 TL',
-      capacity: '15 Students',
-      progress: '50%',
-      features: ['Enhanced Management Suite', 'Custom Workout Builder', lang === 'tr' ? 'Egzersiz Animasyonları' : 'Exercise Animations', 'Priority Email Support'],
-      cta: lang === 'tr' ? 'Silver Seç' : 'Choose Silver',
-      bestValue: true
-    },
-    {
-      name: 'Gold',
-      price: '449 TL',
-      capacity: '25 Students',
-      progress: '100%',
-      features: ['Full Management Suite', 'AI Performance Analysis', '24/7 VIP Support', 'Client Nutrition Logs'],
-      cta: lang === 'tr' ? 'Gold Seç' : 'Choose Gold',
-      isPremium: true
+  useEffect(() => {
+    fetchActivePlan(role as 'trainer' | 'student').then(p => {
+      setActivePlan(p);
+      setLoading(false);
+    });
+  }, [role]);
+
+  const handleSelectPlan = async (plan: PlanTier) => {
+    if (role !== 'trainer') return;
+    if (plan === activePlan) return;
+    setConfirmPlan(plan);
+  };
+
+  const handleConfirm = async () => {
+    if (!confirmPlan) return;
+    setUpgrading(confirmPlan);
+    setConfirmPlan(null);
+    try {
+      const token = localStorage.getItem('fittrack_token');
+      const res = await fetch('/api/trainer/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan: confirmPlan }),
+      });
+      if (res.ok) {
+        setActivePlan(confirmPlan);
+        setSuccessPlan(confirmPlan);
+        localStorage.setItem('fittrack_trainer_plan', confirmPlan);
+        setTimeout(() => setSuccessPlan(null), 3000);
+      }
+    } finally {
+      setUpgrading(null);
     }
-  ];
+  };
+
+  const currentDef = getPlanDef(activePlan);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-background-dark pb-32 md:pb-0 md:pl-64 transition-colors">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/5 sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors">
-            <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
+    <div className="min-h-screen bg-background-dark pb-32 md:pb-0 md:pl-64">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-background-dark/80 backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-4">
+        <div className="flex items-center gap-3 max-w-3xl mx-auto">
+          <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-lg bg-white/5 text-white/60 hover:text-white transition-colors">
+            <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{lang === 'tr' ? 'Koçluk Planları' : 'Coaching Plans'}</h1>
+          <div>
+            <h1 className="text-lg font-black text-white">{lang === 'tr' ? 'Koçluk Planları' : 'Coaching Plans'}</h1>
+            {role !== 'trainer' && (
+              <p className="text-xs text-white/40">{lang === 'tr' ? 'Antrenörünüzün planı sizin için de geçerlidir' : "Your trainer's plan also applies to you"}</p>
+            )}
+          </div>
         </div>
-        {/* Removed "Hoca Öder" badge from here */}
       </header>
 
-      <main className="px-6 py-8">
-        <section className="text-center mb-12">
-          <h2 className="text-3xl font-extrabold mb-4 tracking-tighter text-slate-900 dark:text-white">{lang === 'tr' ? 'Kapasite Seçin' : 'Select Capacity'}</h2>
-          <p className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto text-sm leading-relaxed">
-            {lang === 'tr' ? 'Mevcut listenize uyan bir plan seçin. Öğrenci kitleniz büyüdükçe ölçeklendirin.' : 'Choose a plan that fits your current roster. Scale up as your student base grows.'} 
-          </p>
-        </section>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <div 
-              key={plan.name}
-              className={`flex flex-col rounded-xl border ${plan.bestValue ? 'border-primary' : 'border-slate-200 dark:border-white/5'} bg-slate-50 dark:bg-card-dark p-6 transition-transform hover:scale-[1.02] relative overflow-hidden shadow-sm`}
-            >
-              {plan.bestValue && (
-                <div className="absolute top-4 right-4">
-                  <span className="bg-primary text-white dark:text-background-dark text-[10px] font-black uppercase px-2 py-1 rounded">Best Value</span>
-                </div>
+      <main className="px-4 py-6 max-w-3xl mx-auto flex flex-col gap-6">
+        {/* Current plan banner */}
+        {!loading && (
+          <div className={`rounded-2xl bg-gradient-to-r ${planGradient[activePlan]} border ${planBorderColor[activePlan]} p-4 flex items-center gap-4`}>
+            <div className={`size-12 rounded-xl bg-white/5 flex items-center justify-center`}>
+              <span className={`material-symbols-outlined text-2xl ${planTextColor[activePlan]}`}>{currentDef.icon}</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{lang === 'tr' ? 'Aktif Plan' : 'Active Plan'}</p>
+              <p className={`text-xl font-black ${planTextColor[activePlan]}`}>{currentDef.name}</p>
+              {role !== 'trainer' && (
+                <p className="text-xs text-white/30 mt-0.5">{lang === 'tr' ? 'Antrenörünüzün planından yararlanıyorsunuz' : "You benefit from your trainer's plan"}</p>
               )}
-              {plan.isPremium && (
-                <div className="absolute -right-10 top-5 rotate-45 bg-primary text-white dark:text-background-dark text-[8px] font-black uppercase px-12 py-1 shadow-lg">
-                  Premium AI
-                </div>
-              )}
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-bold text-white/60">{currentDef.price[lang]}</p>
+              <p className="text-[10px] text-white/30">{lang === 'tr' ? `${currentDef.maxStudents} öğrenci` : `${currentDef.maxStudents} students`}</p>
+            </div>
+          </div>
+        )}
 
-              <div className="mb-6">
-                <h3 className={`text-sm font-bold uppercase tracking-widest mb-1 ${plan.bestValue ? 'text-primary' : 'text-slate-400'}`}>{plan.name}</h3>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white">{plan.price}</span>
-                  <span className="text-slate-400 text-xs font-medium">/month</span>
-                </div>
-              </div>
+        {/* Success banner */}
+        {successPlan && (
+          <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4 flex items-center gap-3">
+            <span className="material-symbols-outlined text-green-400">check_circle</span>
+            <p className="text-sm font-bold text-green-400">
+              {lang === 'tr' ? `${getPlanDef(successPlan).name} planına geçiş başarılı!` : `Successfully switched to ${getPlanDef(successPlan).name} plan!`}
+            </p>
+          </div>
+        )}
 
-              <div className="mb-8 p-4 rounded-lg bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Capacity</span>
-                  <span className="text-[10px] font-bold text-slate-900 dark:text-white">{plan.capacity}</span>
-                </div>
-                <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden">
-                  <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: plan.progress }}></div>
-                </div>
-              </div>
+        {/* Student info */}
+        {role !== 'trainer' && (
+          <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-primary mt-0.5">info</span>
+            <p className="text-xs text-white/60 leading-relaxed">
+              {lang === 'tr'
+                ? 'Antrenörünüz plan yükselttiğinde, siz de otomatik olarak o planın tüm özelliklerinden yararlanırsınız. Plan yönetimi yalnızca antrenörlere aittir.'
+                : "When your trainer upgrades their plan, you automatically benefit from all features of that plan. Plan management belongs to trainers only."}
+            </p>
+          </div>
+        )}
 
-              <ul className="space-y-3 mb-8 flex-1">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className={`flex items-center gap-3 text-xs ${i === 1 && plan.isPremium ? 'text-slate-900 dark:text-white font-bold italic' : 'text-slate-600 dark:text-slate-300'}`}>
-                    <span className="material-symbols-outlined text-primary text-lg">
-                      {feature.includes('AI') ? 'psychology' : 'check_circle'}
-                    </span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+        {/* Plan cards */}
+        <div className="flex flex-col gap-4">
+          {PLANS.filter(p => p.id !== 'free').map((plan) => {
+            const isActive = plan.id === activePlan;
+            const isUpgrade = tierOrder[plan.id] > tierOrder[activePlan];
+            const isDowngrade = tierOrder[plan.id] < tierOrder[activePlan];
+            const isLoading = upgrading === plan.id;
 
-              <button 
-                onClick={() => navigate('/checkout')}
-                className="w-full py-3 px-4 rounded-lg bg-white hover:brightness-110 text-[#0B2B53] font-bold transition-all shadow-lg shadow-cta-orange/20 active:scale-95"
+            return (
+              <div
+                key={plan.id}
+                className={`rounded-2xl border transition-all ${isActive
+                  ? `${planBorderColor[plan.id]} bg-gradient-to-br ${planGradient[plan.id]} shadow-lg ${planBgGlow[plan.id]}`
+                  : 'border-white/5 bg-card-dark'
+                }`}
               >
-                {plan.cta}
+                <div className="p-5">
+                  {/* Plan header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`size-10 rounded-xl bg-white/5 flex items-center justify-center`}>
+                        <span className={`material-symbols-outlined ${planTextColor[plan.id]}`}>{plan.icon}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className={`text-lg font-black ${planTextColor[plan.id]}`}>{plan.name}</h3>
+                          {isActive && (
+                            <span className="text-[9px] font-black uppercase bg-white/10 text-white/60 px-2 py-0.5 rounded-full">{lang === 'tr' ? 'Aktif' : 'Active'}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-white/40">{lang === 'tr' ? `Max ${plan.maxStudents} öğrenci` : `Max ${plan.maxStudents} students`}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-xl font-black ${planTextColor[plan.id]}`}>{plan.price[lang].split('/')[0]}</p>
+                      <p className="text-[10px] text-white/30">/{lang === 'tr' ? 'ay' : 'mo'}</p>
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div className="flex flex-col gap-2 mb-4">
+                    {plan.features.map(f => (
+                      <div key={f.id} className="flex items-center gap-2.5">
+                        <span className={`material-symbols-outlined text-base ${f.included ? planTextColor[plan.id] : 'text-white/20'}`}>
+                          {f.included ? 'check_circle' : 'cancel'}
+                        </span>
+                        <span className={`text-xs ${f.included ? 'text-white/80' : 'text-white/25 line-through'}`}>{f.label[lang]}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CTA - only for trainers */}
+                  {role === 'trainer' && (
+                    <button
+                      disabled={isActive || isLoading}
+                      onClick={() => handleSelectPlan(plan.id)}
+                      className={`w-full py-3 rounded-xl font-black text-sm transition-all active:scale-95 ${
+                        isActive
+                          ? 'bg-white/5 text-white/40 cursor-default'
+                          : isUpgrade
+                          ? `bg-gradient-to-r from-primary to-primary/80 text-white hover:opacity-90 shadow-lg shadow-primary/20`
+                          : 'bg-white/10 text-white/60 hover:bg-white/15'
+                      }`}
+                    >
+                      {isLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          {lang === 'tr' ? 'İşleniyor...' : 'Processing...'}
+                        </span>
+                      ) : isActive ? (
+                        lang === 'tr' ? '✓ Aktif Plan' : '✓ Active Plan'
+                      ) : isUpgrade ? (
+                        lang === 'tr' ? `${plan.name}'e Yükselt` : `Upgrade to ${plan.name}`
+                      ) : (
+                        lang === 'tr' ? `${plan.name}'e Geç` : `Switch to ${plan.name}`
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Free plan info */}
+        {role === 'trainer' && activePlan !== 'free' && (
+          <button
+            onClick={() => setConfirmPlan('free')}
+            className="text-xs text-white/30 hover:text-white/50 text-center transition-colors"
+          >
+            {lang === 'tr' ? 'Ücretsiz plana dön' : 'Switch back to free plan'}
+          </button>
+        )}
+      </main>
+
+      {/* Confirm modal */}
+      {confirmPlan && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setConfirmPlan(null)}>
+          <div className="w-full max-w-lg bg-[#0f1923] border border-white/10 rounded-t-3xl p-6 pb-10" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-4 mb-6">
+              <div className={`size-14 rounded-2xl bg-white/5 flex items-center justify-center`}>
+                <span className={`material-symbols-outlined text-3xl ${planTextColor[confirmPlan]}`}>{getPlanDef(confirmPlan).icon}</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">{getPlanDef(confirmPlan).name}</h3>
+                <p className="text-sm text-white/40">{getPlanDef(confirmPlan).price[lang]}</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/60 mb-6 leading-relaxed">
+              {confirmPlan === 'free'
+                ? (lang === 'tr' ? 'Ücretsiz plana geçmek istediğinizden emin misiniz? Premium özelliklerinizi kaybedeceksiniz.' : 'Are you sure you want to switch to the free plan? You will lose your premium features.')
+                : (lang === 'tr'
+                  ? `${getPlanDef(confirmPlan).name} planına geçmek istediğinizden emin misiniz? Öğrencileriniz de bu planın özelliklerinden yararlanabilecek.`
+                  : `Are you sure you want to switch to the ${getPlanDef(confirmPlan).name} plan? Your students will also benefit from this plan's features.`)
+              }
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmPlan(null)} className="flex-1 py-3 rounded-xl bg-white/5 text-white/60 font-bold text-sm">
+                {lang === 'tr' ? 'İptal' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleConfirm}
+                className={`flex-1 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 active:scale-95 transition-all`}
+              >
+                {lang === 'tr' ? 'Onayla' : 'Confirm'}
               </button>
             </div>
-          ))}
+          </div>
         </div>
-      </main>
+      )}
 
       <BottomNav role={role} lang={lang} />
     </div>

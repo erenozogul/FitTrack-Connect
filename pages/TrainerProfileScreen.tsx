@@ -291,6 +291,21 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
       .catch(() => {});
   }, [isTrainer]);
 
+  const [trainerPlan, setTrainerPlan] = useState<string>(() => localStorage.getItem('fittrack_trainer_plan') || 'free');
+
+  useEffect(() => {
+    if (!isTrainer) return;
+    const token = localStorage.getItem('fittrack_token');
+    if (!token) return;
+    fetch('/api/trainer/plan', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : { plan: 'free' })
+      .then(data => {
+        setTrainerPlan(data.plan || 'free');
+        localStorage.setItem('fittrack_trainer_plan', data.plan || 'free');
+      })
+      .catch(() => {});
+  }, [isTrainer]);
+
   const trainerCode = (parsedUser.username || 'TRAINER').toUpperCase().replace(/[^A-Z0-9]/g, '') + '2026';
   const connectedStudentsCount = (() => {
     try {
@@ -544,15 +559,23 @@ const TrainerProfileScreen: React.FC<TrainerProfileScreenProps> = ({
                 <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
               </button>
             ))}
-            {/* Plans link */}
-            <button
-              onClick={() => { window.location.hash = '#/plans'; }}
-              className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors w-full text-left"
-            >
-              <span className="material-symbols-outlined text-primary text-xl">workspace_premium</span>
-              <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Planlar' : 'Plans'}</span>
-              <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
-            </button>
+            {/* Plans link - trainer only */}
+            {isTrainer && (
+              <button
+                onClick={() => { window.location.hash = '#/plans'; }}
+                className="bg-white dark:bg-card-dark border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors w-full text-left"
+              >
+                <span className="material-symbols-outlined text-primary text-xl">workspace_premium</span>
+                <span className="flex-1 text-slate-900 dark:text-white text-sm font-semibold">{lang === 'tr' ? 'Planlar' : 'Plans'}</span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mr-1 ${
+                  trainerPlan === 'gold' ? 'bg-yellow-400/20 text-yellow-400' :
+                  trainerPlan === 'silver' ? 'bg-slate-400/20 text-slate-300' :
+                  trainerPlan === 'bronze' ? 'bg-amber-600/20 text-amber-500' :
+                  'bg-white/5 text-white/30'
+                }`}>{trainerPlan === 'free' ? (lang === 'tr' ? 'Ücretsiz' : 'Free') : trainerPlan.charAt(0).toUpperCase() + trainerPlan.slice(1)}</span>
+                <span className="material-symbols-outlined text-slate-300 dark:text-white/20 text-lg">chevron_right</span>
+              </button>
+            )}
           </div>
         </div>
 

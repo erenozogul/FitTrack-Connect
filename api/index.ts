@@ -244,6 +244,8 @@ try {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
+    }).then(() => {
+      return sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trainer_plan VARCHAR(20) DEFAULT 'free'`;
     }).then(() => console.log("Database tables verified"))
      .catch(err => console.error("Failed to initialize database tables:", err));
   }
@@ -1367,6 +1369,43 @@ app.get('/api/report', authenticateToken, async (req: any, res: any) => {
     console.error('Report error:', error);
     res.status(500).json({ error: 'error_internal' });
   }
+});
+
+// ─── Trainer Plan Endpoints ───────────────────────────
+
+app.get('/api/trainer/plan', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    const rows = await sql`SELECT trainer_plan FROM users WHERE id = ${req.user.userId}`;
+    res.json({ plan: rows[0]?.trainer_plan || 'free' });
+  } catch { res.status(500).json({ error: 'error_internal' }); }
+});
+
+app.post('/api/trainer/plan', authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== 'trainer') return res.status(403).json({ error: 'error_forbidden' });
+    const { plan } = req.body;
+    const validPlans = ['free', 'bronze', 'silver', 'gold'];
+    if (!validPlans.includes(plan)) return res.status(400).json({ error: 'error_invalid_plan' });
+    const sql = getDb();
+    await sql`UPDATE users SET trainer_plan = ${plan} WHERE id = ${req.user.userId}`;
+    res.json({ plan });
+  } catch { res.status(500).json({ error: 'error_internal' }); }
+});
+
+app.get('/api/student/trainer-plan', authenticateToken, async (req: any, res: any) => {
+  try {
+    const sql = getDb();
+    // Find trainer connected to this student
+    const rows = await sql`
+      SELECT u.trainer_plan
+      FROM trainer_student ts
+      JOIN users u ON u.id = ts.trainer_id
+      WHERE ts.student_id = ${req.user.userId}
+      LIMIT 1
+    `;
+    res.json({ plan: rows[0]?.trainer_plan || 'free' });
+  } catch { res.status(500).json({ error: 'error_internal' }); }
 });
 
 export default app;
