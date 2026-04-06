@@ -23,6 +23,45 @@ interface DaySchedule {
   level: { tr: string; en: string };
 }
 
+// Static exercise lookup by workoutId
+const workoutExercises: Record<string, { name: string; target: { tr: string; en: string } }[]> = {
+  chest: [
+    { name: 'Dumbbell Fly',  target: { tr: 'Göğüs (Pektoral)', en: 'Chest (Pectoral)' } },
+    { name: 'Bench Press',   target: { tr: 'Göğüs, Triceps, Ön Omuz', en: 'Chest, Triceps, Front Shoulder' } },
+    { name: 'Push-Up',       target: { tr: 'Göğüs, Triceps, Core', en: 'Chest, Triceps, Core' } },
+  ],
+  legs: [
+    { name: 'Squat',              target: { tr: 'Quadriceps, Hamstring, Glute', en: 'Quadriceps, Hamstrings, Glutes' } },
+    { name: 'Romanian Deadlift',  target: { tr: 'Hamstring, Glute, Bel', en: 'Hamstrings, Glutes, Lower Back' } },
+    { name: 'Lunge',              target: { tr: 'Quadriceps, Glute, Denge', en: 'Quadriceps, Glutes, Balance' } },
+  ],
+  shoulders: [
+    { name: 'Lateral Raise',   target: { tr: 'Deltoid (Yan)', en: 'Lateral Deltoid' } },
+    { name: 'Shoulder Press',  target: { tr: 'Deltoid (Ön/Yan), Triceps', en: 'Front/Lateral Deltoid, Triceps' } },
+    { name: 'Face Pull',       target: { tr: 'Arka Deltoid, Rotator Cuff', en: 'Rear Deltoid, Rotator Cuff' } },
+  ],
+  arms: [
+    { name: 'Bicep Curl',   target: { tr: 'Biceps Brachii', en: 'Biceps Brachii' } },
+    { name: 'Tricep Dip',   target: { tr: 'Triceps Brachii', en: 'Triceps Brachii' } },
+    { name: 'Hammer Curl',  target: { tr: 'Brachialis, Ön Kol', en: 'Brachialis, Forearm' } },
+  ],
+  back: [
+    { name: 'Lat Pulldown',    target: { tr: 'Latissimus Dorsi, Biceps', en: 'Latissimus Dorsi, Biceps' } },
+    { name: 'Bent-Over Row',   target: { tr: 'Orta Sırt, Rhomboid, Biceps', en: 'Mid Back, Rhomboids, Biceps' } },
+    { name: 'Deadlift',        target: { tr: 'Tüm Arka Zincir', en: 'Full Posterior Chain' } },
+  ],
+  cardio: [
+    { name: 'Jump Rope',     target: { tr: 'Kalp-Damar, Koordinasyon', en: 'Cardiovascular, Coordination' } },
+    { name: 'Jumping Jacks', target: { tr: 'Tüm Vücut, Kardiyo', en: 'Full Body, Cardio' } },
+    { name: 'Burpee',        target: { tr: 'Tüm Vücut, HIIT', en: 'Full Body, HIIT' } },
+  ],
+  calisthenics: [
+    { name: 'Pull-Up',    target: { tr: 'Lat, Biceps, Üst Sırt', en: 'Lats, Biceps, Upper Back' } },
+    { name: 'Muscle-Up',  target: { tr: 'Tüm Üst Vücut', en: 'Full Upper Body' } },
+    { name: 'Plank',      target: { tr: 'Core, Omuz Stabilitesi', en: 'Core, Shoulder Stability' } },
+  ],
+};
+
 const weekSchedule: Record<number, DaySchedule> = {
   16: {
     type: 'workout',
@@ -98,6 +137,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
   });
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [expandedAssignmentId, setExpandedAssignmentId] = useState<number | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
@@ -544,45 +584,81 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
               {lang === 'tr' ? 'Atanan Seanslar' : 'Assigned Sessions'}
             </h2>
             <div className="flex flex-col gap-2">
-              {(assignments[selectedDay] || []).map((a: any, idx: number) => (
-                <div key={a.id ?? idx} className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all ${a.completed ? 'bg-green-500/10 border-green-500/20' : 'bg-card-dark border-white/5'}`}>
-                  <div className={`size-10 rounded-full flex items-center justify-center flex-shrink-0 ${a.completed ? 'bg-green-500/20' : 'bg-primary/20'}`}>
-                    <span className={`material-symbols-outlined text-lg ${a.completed ? 'text-green-400' : 'text-primary'}`}>
-                      {a.completed ? 'check_circle' : 'fitness_center'}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold truncate ${a.completed ? 'text-white/50 line-through' : 'text-white'}`}>{a.workoutName}</p>
-                    {(a.startTime || a.endTime) && (
-                      <p className="text-[10px] text-white/40 font-semibold mt-0.5">{a.startTime}{a.endTime ? ` – ${a.endTime}` : ''}</p>
+              {(assignments[selectedDay] || []).map((a: any, idx: number) => {
+                const isExpanded = expandedAssignmentId === (a.id ?? idx);
+                const exercises = a.workoutId ? (workoutExercises[a.workoutId] || []) : [];
+                return (
+                  <div key={a.id ?? idx} className={`rounded-xl border transition-all ${a.completed ? 'bg-green-500/10 border-green-500/20' : 'bg-card-dark border-white/5'}`}>
+                    {/* Main row */}
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className={`size-10 rounded-full flex items-center justify-center flex-shrink-0 ${a.completed ? 'bg-green-500/20' : 'bg-primary/20'}`}>
+                        <span className={`material-symbols-outlined text-lg ${a.completed ? 'text-green-400' : 'text-primary'}`}>
+                          {a.completed ? 'check_circle' : 'fitness_center'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold truncate ${a.completed ? 'text-white/50 line-through' : 'text-white'}`}>{a.workoutName}</p>
+                        {(a.startTime || a.endTime) && (
+                          <p className="text-[10px] text-white/40 font-semibold mt-0.5">{a.startTime}{a.endTime ? ` – ${a.endTime}` : ''}</p>
+                        )}
+                      </div>
+                      {/* Expand exercises button */}
+                      {exercises.length > 0 && (
+                        <button
+                          onClick={() => setExpandedAssignmentId(isExpanded ? null : (a.id ?? idx))}
+                          className="size-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors active:scale-95"
+                          title={lang === 'tr' ? 'Hareketler' : 'Exercises'}
+                        >
+                          <span className={`material-symbols-outlined text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => a.id && handleCompleteAssignment(a.id, selectedDay, a.completed)}
+                        disabled={completingId === a.id}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 ${
+                          a.completed
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : 'bg-primary text-white hover:bg-primary/80'
+                        }`}
+                      >
+                        {completingId === a.id
+                          ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                          : <span className="material-symbols-outlined text-sm">{a.completed ? 'undo' : 'check'}</span>
+                        }
+                        {a.completed
+                          ? (lang === 'tr' ? 'Geri Al' : 'Undo')
+                          : (lang === 'tr' ? 'Tamamla' : 'Complete')
+                        }
+                      </button>
+                    </div>
+                    {/* Expanded exercise list */}
+                    {isExpanded && exercises.length > 0 && (
+                      <div className="border-t border-white/5 px-4 pb-3 pt-2 flex flex-col gap-2">
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">
+                          {lang === 'tr' ? 'Hareketler' : 'Exercises'}
+                        </p>
+                        {exercises.map((ex, i) => (
+                          <div key={i} className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
+                            <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-primary text-sm">exercise</span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white">{ex.name}</p>
+                              <p className="text-[10px] text-white/40 truncate">{ex.target[lang]}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => a.id && handleCompleteAssignment(a.id, selectedDay, a.completed)}
-                    disabled={completingId === a.id}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1 ${
-                      a.completed
-                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                        : 'bg-primary text-white hover:bg-primary/80'
-                    }`}
-                  >
-                    {completingId === a.id
-                      ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                      : <span className="material-symbols-outlined text-sm">{a.completed ? 'undo' : 'check'}</span>
-                    }
-                    {a.completed
-                      ? (lang === 'tr' ? 'Geri Al' : 'Undo')
-                      : (lang === 'tr' ? 'Tamamla' : 'Complete')
-                    }
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
 
-        {/* Hero Section — student only */}
-        {!isTrainer && (
+        {/* Hero Section — student only, hidden when assignments exist */}
+        {!isTrainer && (assignments[selectedDay] || []).length === 0 && (
         <section>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">
             {daySchedule.type === 'off' ? (lang === 'tr' ? 'Günün Durumu' : 'Day Status') : t.todaysWorkout}
