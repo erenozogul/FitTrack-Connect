@@ -170,6 +170,11 @@ try {
         END $$;
       `;
     }).then(() => {
+      // Fresh TEXT column - never existed as JSONB, guaranteed clean storage
+      return sql`
+        ALTER TABLE assignments ADD COLUMN IF NOT EXISTS exercise_list TEXT DEFAULT '';
+      `;
+    }).then(() => {
       return sql`
         CREATE TABLE IF NOT EXISTS notifications (
           id SERIAL PRIMARY KEY,
@@ -706,10 +711,11 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
     }
 
     const exercisesArr = Array.isArray(exercises) ? exercises : [];
-    const exercisesJson = JSON.stringify(exercisesArr);
+    // exercise_list is a fresh TEXT column (never JSONB) — reliable plain JSON storage
+    const exerciseListJson = JSON.stringify(exercisesArr);
     const result = await sql`
-      INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time, exercises)
-      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null}, ${exercisesJson})
+      INSERT INTO assignments (trainer_id, student_id, student_name, workout_id, workout_name, assigned_date, start_time, end_time, exercise_list)
+      VALUES (${req.user.userId}, ${studentId}, ${studentName}, ${workoutId || null}, ${workoutName}, ${assignedDate}::date, ${startTime || null}, ${endTime || null}, ${exerciseListJson})
       RETURNING *
     `;
     const row = result[0];
@@ -722,7 +728,7 @@ app.post("/api/assignments", authenticateToken, async (req: any, res: any) => {
       assignedDate: dateToStr(row.assigned_date),
       startTime: row.start_time,
       endTime: row.end_time,
-      exercises: parseExercises(row.exercises),
+      exercises: parseExercises(row.exercise_list),
     });
   } catch (error) {
     console.error("Create assignment error:", error);
@@ -757,7 +763,8 @@ app.get("/api/assignments", authenticateToken, async (req: any, res: any) => {
       startTime: r.start_time,
       endTime: r.end_time,
       completed: r.completed ?? false,
-      exercises: parseExercises(r.exercises),
+      // Read from exercise_list (fresh TEXT column); fall back to old exercises column for legacy rows
+      exercises: (() => { const a = parseExercises(r.exercise_list); return a.length > 0 ? a : parseExercises(r.exercises); })(),
     })));
   } catch (error) {
     res.status(500).json({ error: "error_internal" });

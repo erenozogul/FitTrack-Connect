@@ -976,6 +976,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       assignedDate: editingAssignment.dateKey,
                       startTime: editStartTime,
                       endTime: editEndTime,
+                      exercises: editingAssignment.exercises || [],
                     }),
                   });
                   if (res.status === 409) {
@@ -989,7 +990,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                       const dk = editingAssignment.dateKey;
                       updated[dk] = (updated[dk] || [])
                         .filter((a: any) => a.id !== editingAssignment.id)
-                        .concat([{ id: newA.id, studentId: editingAssignment.studentId, studentName: editingAssignment.studentName, workoutId: editingAssignment.workoutId, workoutName: editingAssignment.workoutName, startTime: editStartTime, endTime: editEndTime }]);
+                        .concat([{ id: newA.id, studentId: editingAssignment.studentId, studentName: editingAssignment.studentName, workoutId: editingAssignment.workoutId, workoutName: editingAssignment.workoutName, startTime: editStartTime, endTime: editEndTime, exercises: editingAssignment.exercises || [] }]);
                       updated[dk].sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''));
                       return updated;
                     });

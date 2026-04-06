@@ -1389,7 +1389,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
             <div className="flex flex-col gap-3">
               {isTrainer && selectedBodyPart && (
                 <button
-                  onClick={() => { setAssignTarget(selectedBodyPart); setAssignSuccess(false); }}
+                  onClick={() => { setAssignTarget(selectedBodyPart); setAssignSuccess(false); setSelectedExerciseIds(selectedExercise ? [selectedExercise.id] : []); }}
                   className="w-full bg-cta-orange text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   <span className="material-symbols-outlined">person_add</span>
