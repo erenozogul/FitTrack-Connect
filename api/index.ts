@@ -47,8 +47,9 @@ const apiRateLimit = createRateLimit(100, 60 * 1000);       // 100 req/min for g
 app.use('/api', apiRateLimit);
 
 // ─── File Upload (multer) ─────────────────────────────
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// Use /tmp on Vercel (read-only FS), fallback to local uploads dir in dev
+const uploadsDir = process.env.VERCEL ? '/tmp/uploads' : path.join(process.cwd(), 'uploads');
+try { if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true }); } catch (_) {}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
