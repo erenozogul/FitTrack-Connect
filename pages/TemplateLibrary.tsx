@@ -1007,6 +1007,22 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     if (!student || !assignTarget) return;
     setAssignError(null);
 
+    // Past date/time validation
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const currentTimeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    if (!recurringEnabled) {
+      if (assignDate < todayStr) {
+        setAssignError(lang === 'tr' ? 'Geçmiş tarihe seans atanamaz.' : 'Cannot assign to a past date.');
+        return;
+      }
+      if (assignDate === todayStr && assignEndTime && assignEndTime <= currentTimeStr) {
+        setAssignError(lang === 'tr' ? 'Geçmiş saate seans atanamaz.' : 'Cannot assign to a past time slot.');
+        return;
+      }
+    }
+
     // Build list of dates to assign
     const datesToAssign: string[] = [];
     if (recurringEnabled && recurringDays.length > 0) {
@@ -1020,6 +1036,18 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
         }
       }
       datesToAssign.sort();
+      // Filter out past dates for recurring
+      const filtered = datesToAssign.filter(d => {
+        if (d < todayStr) return false;
+        if (d === todayStr && assignEndTime && assignEndTime <= currentTimeStr) return false;
+        return true;
+      });
+      if (filtered.length === 0) {
+        setAssignError(lang === 'tr' ? 'Seçili günlerde gelecekte geçerli tarih bulunamadı.' : 'No valid future dates found for selected days.');
+        return;
+      }
+      datesToAssign.length = 0;
+      datesToAssign.push(...filtered);
     } else {
       datesToAssign.push(assignDate);
     }
@@ -1430,6 +1458,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                   <input
                     type="date"
                     value={assignDate}
+                    min={(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })()}
                     onChange={e => setAssignDate(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
                   />
@@ -1494,6 +1523,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                       <input
                         type="time"
                         value={assignStartTime}
+                        min={(() => { const n = new Date(); const t = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; const today = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; return assignDate === today ? t : undefined; })()}
                         onChange={e => setAssignStartTime(e.target.value)}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
                       />
