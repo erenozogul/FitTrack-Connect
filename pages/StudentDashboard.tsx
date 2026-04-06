@@ -487,7 +487,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout, lang, rol
                 })()}
               </h2>
               <button
-                onClick={() => navigate('/library')}
+                onClick={() => navigate(`/library?date=${selectedDay}`)}
                 className="flex items-center gap-1 text-primary text-[10px] font-black hover:underline"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
