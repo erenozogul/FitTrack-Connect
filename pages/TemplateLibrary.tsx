@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { BottomNav } from '../components/Navigation';
 import { translations } from '../App';
 import { addNotification } from '../utils/notifications';
@@ -900,6 +900,7 @@ interface TemplateLibraryProps {
 
 const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userName, role = 'trainer' }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const t = translations[lang];
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart | null>(null);
@@ -974,11 +975,10 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
   const [assignTarget, setAssignTarget] = useState<BodyPart | null>(null);
   const [assignStudentId, setAssignStudentId] = useState<number>(0);
   const [assignDate, setAssignDate] = useState<string>(() => {
+    const param = new URLSearchParams(location.search).get('date');
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) return param;
     const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
   const [assignStartTime, setAssignStartTime] = useState<string>('09:00');
   const [assignEndTime, setAssignEndTime] = useState<string>('10:00');
