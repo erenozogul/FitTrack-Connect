@@ -1012,6 +1012,12 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
     const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     const currentTimeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
+    // Start must be before end
+    if (assignStartTime && assignEndTime && assignStartTime >= assignEndTime) {
+      setAssignError(lang === 'tr' ? 'Başlangıç saati bitiş saatinden önce olmalıdır.' : 'Start time must be before end time.');
+      return;
+    }
+
     if (!recurringEnabled) {
       if (assignDate < todayStr) {
         setAssignError(lang === 'tr' ? 'Geçmiş tarihe seans atanamaz.' : 'Cannot assign to a past date.');
@@ -1534,6 +1540,7 @@ const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onLogout, lang, userN
                       <input
                         type="time"
                         value={assignEndTime}
+                        min={assignStartTime || undefined}
                         onChange={e => setAssignEndTime(e.target.value)}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/60 [color-scheme:dark]"
                       />
